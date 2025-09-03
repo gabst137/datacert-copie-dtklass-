@@ -275,48 +275,78 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
               </div>
             </div>
           ) : (
-            <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
-              <div className="grid grid-cols-12 px-4 py-3 text-sm font-medium text-gray-600 border-b border-gray-200 bg-gray-50">
-                <div className="col-span-6">Project</div>
-                <div className="col-span-3">Created</div>
-                <div className="col-span-3 text-right">Actions</div>
-              </div>
+            <div className="space-y-6">
               {projects.map((project) => (
-                <div key={project.id} className="border-b border-gray-200">
-                  <div className="grid grid-cols-12 items-center px-4 py-3 hover:bg-gray-50">
-                    <div className="col-span-6 flex items-center gap-2">
-                      <button onClick={() => toggleExpand(project)} className="text-gray-600 hover:text-gray-800">
-                        {/* caret icon */}
-                        <svg className={`h-5 w-5 transform transition-transform ${expanded[project.id] ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                <div
+                  key={project.id}
+                  className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow p-6"
+                  style={{ boxShadow: '0 8px 20px rgba(0,0,0,0.04), 0 0 0 1px rgba(229,231,235,0.6)' }}
+                >
+                  {/* Card header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <button onClick={() => toggleExpand(project)} className="mr-3 text-gray-700"
+                              style={{
+                                height: '32px', width: '32px', borderRadius: '10px',
+                                background: '#f3f4ff', border: '1px solid #e5e7eb',
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
+                              }} aria-label="Toggle flows">
+                        <svg
+                          className="h-4 w-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          style={{ transform: expanded[project.id] ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
                       </button>
-                      <span className="font-medium text-gray-900">{project.projectName}</span>
+                      <div>
+                        <div className="text-xl font-semibold text-gray-900">{project.projectName}</div>
+                        <div className="text-sm text-gray-600">Created {project.createdAt?.toDate().toLocaleDateString() || '—'}</div>
+                      </div>
                     </div>
-                    <div className="col-span-3 text-sm text-gray-600">{project.createdAt?.toDate().toLocaleDateString() || '—'}</div>
-                    <div className="col-span-3 flex justify-end gap-3">
-                      <button title="Open" onClick={() => onOpenProject ? onOpenProject(project) : navigate(`/dashboard/projects/${project.id}`)} className="text-indigo-600 hover:text-indigo-700 text-sm">Open</button>
-                      <button title="Delete project" onClick={() => handleDeleteProject(project)} className="text-gray-500 hover:text-red-600">
-                        {/* trash icon */}
-                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <div className="flex items-center space-x-3">
+                      <button
+                        title="Open"
+                        onClick={() => (onOpenProject ? onOpenProject(project) : navigate(`/dashboard/projects/${project.id}`))}
+                        className="border border-gray-300 text-indigo-700 rounded-md text-sm font-medium"
+                        style={{ height: '36px', padding: '0 16px', background: '#fff' }}
+                      >
+                        Open
+                      </button>
+                      <button
+                        title="Delete project"
+                        onClick={() => handleDeleteProject(project)}
+                        className="border border-gray-300 text-gray-600 rounded-md flex items-center justify-center"
+                        aria-label="Delete project"
+                        style={{ height: '36px', width: '36px', marginRight: '6px', background: '#fff' }}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ height: 20, width: 20 }}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m-7 0a2 2 0 002-2h2a2 2 0 002 2m-7 0h10" />
                         </svg>
                       </button>
                     </div>
                   </div>
 
+                  {/* Expanded flows section */}
                   {expanded[project.id] && (
-                    <div className="bg-gray-50 px-8 py-3">
-                      {/* Add flow inline */}
-                      <div className="flex gap-2 mb-3">
+                    <div className="mt-4">
+                      <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex items-center gap-3">
                         <input
-                          className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm"
+                          className="flex-1 border border-gray-300 rounded-md px-3 h-10 text-sm"
                           placeholder="New flow name"
                           value={newFlowName[project.id] || ''}
                           onChange={(e) => setNewFlowName((m) => ({ ...m, [project.id]: e.target.value }))}
                           onKeyDown={(e) => e.key === 'Enter' && handleCreateFlow(project)}
                         />
-                        <button onClick={() => handleCreateFlow(project)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm">Add Flow</button>
+                        <button onClick={() => handleCreateFlow(project)}
+                                className="inline-flex items-center justify-center h-10 px-4 rounded-md text-sm text-white"
+                                style={{ background: '#4f46e5' }}
+                        >
+                          Add Flow
+                        </button>
                       </div>
 
                       {flowsLoading[project.id] ? (
@@ -324,16 +354,27 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
                       ) : !flows[project.id] || flows[project.id].length === 0 ? (
                         <div className="text-sm text-gray-600">No flows yet.</div>
                       ) : (
-                        <div className="divide-y divide-gray-200 border border-gray-200 rounded-md bg-white">
+                        <div className="grid grid-cols-1 gap-3">
                           {flows[project.id].map((f) => (
-                            <div key={f.id} className="flex items-center justify-between px-4 py-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-800 text-sm">{f.flowName || 'Untitled flow'}</span>
-                                <span className="text-xs text-gray-500">{f.status || 'NU'}</span>
+                            <div
+                              key={f.id}
+                              className="bg-white border border-gray-200 rounded-md p-4 shadow-sm flex items-center justify-between"
+                              style={{ boxShadow: '0 6px 14px rgba(0,0,0,0.04), 0 0 0 1px rgba(229,231,235,0.7)', minHeight: '64px' }}
+                            >
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">{f.flowName || 'Untitled flow'}</div>
+                                <div className="text-xs text-gray-600">Status: {f.status || 'NU'}</div>
+                                <div className="text-xs text-gray-500">Updated: {f.lastModified?.toDate ? f.lastModified.toDate().toLocaleString() : '—'}</div>
                               </div>
-                              <div className="flex items-center gap-3">
-                                <button onClick={() => onOpenFlow && onOpenFlow({ ...f, projectId: project.id })} className="text-indigo-600 hover:text-indigo-700 text-sm">Open</button>
-                                <button title="Delete flow" onClick={() => handleDeleteFlow(project, f)} className="text-gray-500 hover:text-red-600">
+                              <div className="flex items-center space-x-3">
+                                <button
+                                  onClick={() => onOpenFlow && onOpenFlow({ ...f, projectId: project.id })}
+                                  className="inline-flex items-center justify-center rounded-md text-sm font-medium text-white"
+                                  style={{ height: '40px', padding: '0 18px', background: '#16a34a' }}
+                                >
+                                  Open
+                                </button>
+                                <button title="Delete flow" onClick={() => handleDeleteFlow(project, f)} className="text-gray-500 hover:text-red-600" aria-label="Delete flow">
                                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m-7 0a2 2 0 002-2h2a2 2 0 002 2m-7 0h10" />
                                   </svg>

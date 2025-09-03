@@ -3,6 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
 
 // Firebase configuration object
 const firebaseConfig = {
@@ -24,6 +25,9 @@ export const auth = getAuth(app);
 // Initialize Cloud Firestore and get a reference to the service
 export const db = getFirestore(app);
 
+// Initialize Cloud Storage and get a reference to the service
+export const storage = getStorage(app);
+
 // Connect to emulators in development
 const isEmulator = import.meta.env.DEV && import.meta.env.VITE_USE_EMULATOR === 'true';
 
@@ -34,6 +38,9 @@ if (isEmulator) {
     
     // Connect to Firestore emulator
     connectFirestoreEmulator(db, 'localhost', 8080);
+    
+    // Connect to Storage emulator
+    connectStorageEmulator(storage, 'localhost', 9199);
   } catch (error) {
     console.warn('Emulator connection failed:', error);
   }
