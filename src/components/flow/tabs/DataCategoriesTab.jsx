@@ -155,16 +155,22 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
       <div className="text-sm font-medium" style={{ marginBottom: 12 }}>Categorii de date personale prelucrate</div>
 
       {/* Picker for default categories */}
-      <div className="relative" style={{ marginBottom: 12 }}>
+      <div className="relative" style={{ marginBottom: 16 }}>
         <button
           onClick={() => setMenuOpen((v) => !v)}
           disabled={availableOptions.length === 0}
-          className="border border-gray-300 px-3 py-2 rounded-md text-sm bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 rounded-xl text-sm bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ border: '2px solid #c7d2fe', color: '#3730a3' }}
         >
-          {availableOptions.length ? 'Adaugă din listă' : 'Toate categoriile au fost adăugate'}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+            {availableOptions.length ? 'Adaugă din listă' : 'Toate categoriile au fost adăugate'}
+          </span>
         </button>
         {menuOpen && availableOptions.length > 0 && (
-          <div className="absolute z-10 mt-2 w-full bg-white border border-gray-200 rounded-md shadow-md" style={{ maxHeight: 260, overflowY: 'auto' }}>
+          <div className="absolute z-10 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-md" style={{ maxHeight: 260, overflowY: 'auto' }}>
             {availableOptions.map((opt) => (
               <button
                 key={opt.id}
@@ -185,23 +191,25 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
           const completedCount = ['enumerare','method','period','storageOnly','legalBasis']
             .reduce((acc, k) => acc + (rowData[k] && String(rowData[k]).trim() ? 1 : 0), 0);
           return (
-            <div key={row.id} className="border border-gray-200 rounded-md" style={{ marginBottom: 12 }}>
+            <div key={row.id} className="rounded-lg" style={{ marginBottom: 16 }}>
               <button
                 onClick={() => toggle(row.id)}
-                className="w-full flex items-center justify-between px-3 py-2 text-sm bg-gray-50 rounded-t-md"
+                className="w-full flex items-center justify-between px-4 py-3 text-sm bg-white rounded-lg shadow-sm"
+                style={{ border: '2px solid #e5e7eb' }}
               >
-                <div className="flex items-center" style={{ gap: 8 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: open[row.id] ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                <div className="flex items-center" style={{ gap: 10 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: open[row.id] ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
                   <span className="text-gray-900">{label}</span>
                 </div>
-                <div className="flex items-center" style={{ gap: 8 }}>
+                <div className="flex items-center" style={{ gap: 10 }}>
                   <span className="text-xs text-gray-600">{completedCount}/5 completate</span>
                   {/* Remove button for selected categories */}
                   <button
                     onClick={(e) => { e.stopPropagation(); removeCustomRow(row.id); }}
-                    className="text-xs border border-gray-300 rounded-md px-2 py-1 hover:bg-gray-50"
+                    className="text-xs rounded-md px-2 py-1 hover:bg-gray-50"
+                    style={{ border: '1px solid #d1d5db' }}
                   >
                     Elimină
                   </button>
@@ -209,7 +217,7 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
               </button>
 
               {open[row.id] && (
-                <div className="grid" style={{ padding: 12, gridTemplateColumns: 'repeat(5, minmax(200px, 1fr))', gap: 12 }}>
+                <div className="grid bg-gray-50 rounded-lg" style={{ padding: 14, border: '1px solid #e5e7eb', borderTop: '0', gridTemplateColumns: 'repeat(5, minmax(200px, 1fr))', gap: 14 }}>
                   <Field rowId={row.id} field="enumerare" label={HEADERS[0]} />
                   <Field rowId={row.id} field="method" label={HEADERS[1]} />
                   <Field rowId={row.id} field="period" label={HEADERS[2]} />
