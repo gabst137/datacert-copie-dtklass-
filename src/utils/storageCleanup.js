@@ -12,14 +12,24 @@ async function deletePrefix(prefixRef) {
   }
 }
 
-export async function deleteFlowStorage(userId, flowId) {
+// Best-effort deletion with optional timeout so UI isn't blocked
+export async function deleteFlowStorage(userId, flowId, { timeoutMs = 3000 } = {}) {
   if (!userId || !flowId) return;
   const baseRef = ref(storage, `companies/${userId}/flows/${flowId}`);
-  try {
-    await deletePrefix(baseRef);
-  } catch {
-    // ignore errors to avoid blocking UI on best-effort cleanup
-  }
+  const task = (async () => {
+    try {
+      await deletePrefix(baseRef);
+    } catch {
+      // ignore errors to avoid blocking UI on best-effort cleanup
+    }
+  })();
+
+  // Enforce a timeout so network/storage issues don't hang deletions
+  if (!timeoutMs) return task;
+  return Promise.race([
+    task,
+    new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+  ]);
 }
 
 export default { deleteFlowStorage };

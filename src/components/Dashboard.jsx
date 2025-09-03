@@ -17,6 +17,7 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
   const [flowsLoading, setFlowsLoading] = useState({}); // { [projectId]: boolean }
   const [newFlowName, setNewFlowName] = useState({}); // { [projectId]: string }
   const [unsubs, setUnsubs] = useState({}); // { [projectId]: () => void }
+  const [deletingProjectId, setDeletingProjectId] = useState(null);
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -127,20 +128,43 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
     const ok = window.confirm(`Delete project "${project.projectName}" and all its flows?`);
     if (!ok) return;
     try {
+      setDeletingProjectId(pid);
       // delete all flows under project (docs + storage)
       const flowsCol = collection(db, `companies/${currentUser.uid}/projects/${pid}/flows`);
       const snap = await getDocs(flowsCol);
-      await Promise.all(
-        snap.docs.map(async (d) => {
-          await deleteFlowStorage(currentUser.uid, d.id);
+      const deletions = snap.docs.map(async (d) => {
+        try {
+          // Run storage cleanup with timeout, but do not block doc deletion
+          await deleteFlowStorage(currentUser.uid, d.id, { timeoutMs: 3000 });
+        } catch (_) {}
+        try {
           await deleteDoc(d.ref);
-        })
-      );
+        } catch (err) {
+          console.error('Failed deleting flow doc', d.id, err);
+        }
+      });
+      await Promise.allSettled(deletions);
       // delete the project doc
       await deleteDoc(doc(db, `companies/${currentUser.uid}/projects/${pid}`));
+      // optimistic local update so UI responds immediately
+      setProjects((list) => list.filter((p) => p.id !== pid));
+      // clean any listeners/state for this project
+      if (unsubs[pid]) {
+        try { unsubs[pid](); } catch (_) {}
+      }
+      setUnsubs((u) => {
+        const { [pid]: _, ...rest } = u; // eslint-disable-line no-unused-vars
+        return rest;
+      });
+      setExpanded((e) => {
+        const { [pid]: _, ...rest } = e; // eslint-disable-line no-unused-vars
+        return rest;
+      });
     } catch (e) {
       console.error('Failed to delete project', e);
       alert('Failed to delete project');
+    } finally {
+      setDeletingProjectId(null);
     }
   }
 
@@ -326,13 +350,18 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
                       <button
                         title="Delete project"
                         onClick={() => handleDeleteProject(project)}
+                        disabled={deletingProjectId === project.id}
                         className="border border-gray-300 text-gray-600 rounded-md flex items-center justify-center"
                         aria-label="Delete project"
                         style={{ height: '36px', width: '36px', marginRight: '6px', background: '#fff' }}
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ height: 20, width: 20 }}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m-7 0a2 2 0 002-2h2a2 2 0 002 2m-7 0h10" />
-                        </svg>
+                        {deletingProjectId === project.id ? (
+                          <span className="animate-spin h-5 w-5 border-2 border-gray-400 border-t-transparent rounded-full"></span>
+                        ) : (
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ height: 20, width: 20 }}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m-7 0a2 2 0 002-2h2a2 2 0 002 2m-7 0h10" />
+                          </svg>
+                        )}
                       </button>
                     </div>
                   </div>
