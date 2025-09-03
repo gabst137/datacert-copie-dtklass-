@@ -77,9 +77,20 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
   const [diagramData, setDiagramData] = useState(null);
   const [activeTab, setActiveTab] = useState('general');
 
+  // Memoized callback for diagram modal close to prevent unnecessary re-renders
+  const handleDiagramModalClose = useCallback(() => {
+    setShowDiagramModal(false);
+  }, []);
+
+  // Memoized callback for categoryMatrix updates to prevent unnecessary re-renders
+  const handleCategoryMatrixChange = useCallback((categoryMatrix) => {
+    setFormData(prev => ({ ...prev, categoryMatrix }));
+  }, []);
+
   const projectId = flowProp?.projectId || projectIdProp || params.projectId;
   const flowId = flowProp?.id || params.flowId;
 
+  // Load flow data on mount or when identifying parameters change
   useEffect(() => {
     async function load() {
       if (!currentUser || !projectId || !flowId) return;
@@ -108,32 +119,30 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
               duration: { value: 10, unit: 'Ani' }, 
               policyDetails: '', 
               recipientCategories: [],
-              documents: [] 
+              documents: []
             },
             securityData: data.securityData || { 
               technicalMeasures: [], 
               organizationalMeasures: [], 
-              policyDocument: '',
               documents: [] 
             },
-            categoryMatrix: data.categoryMatrix || (data.formData && data.formData.categoryMatrix) || undefined,
-            ...(data.formData || {}),
+            categoryMatrix: data.categoryMatrix || {}
           });
           
           // Load processes
-          setProcesses(data.processes || []);
+          setProcesses(Array.isArray(data.processes) ? data.processes : []);
           
           // Load diagram data
           setDiagramData(data.diagramData || null);
-          
-          setLastSaved(data.lastModified?.toDate());
         }
+      } catch (error) {
+        console.error('Error loading flow:', error);
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [currentUser, projectId, flowId]);
+  }, [currentUser, projectId, flowId]); // Only reload when identifying parameters change
 
   // Manual save only (auto-save disabled)
   const handleSave = useCallback(async () => {
@@ -185,34 +194,35 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
     }
   }
 
-  // Update handlers for each data section
-  const updateGeneralData = (data) => {
+  // Memoized update handlers for each data section to prevent unnecessary re-renders
+  const updateGeneralData = useCallback((data) => {
     setFormData(prev => ({ ...prev, generalData: data }));
-  };
+  }, []);
   
-  const updatePeopleData = (data) => {
+  const updatePeopleData = useCallback((data) => {
     setFormData(prev => ({ ...prev, peopleData: data }));
-  };
+  }, []);
   
-  const updateLegalData = (data) => {
+  const updateLegalData = useCallback((data) => {
     setFormData(prev => ({ ...prev, legalData: data }));
-  };
+  }, []);
   
-  const updateProcessingData = (data) => {
+  const updateProcessingData = useCallback((data) => {
     setFormData(prev => ({ ...prev, processingData: data }));
-  };
+  }, []);
   
-  const updateStorageData = (data) => {
+  const updateStorageData = useCallback((data) => {
     setFormData(prev => ({ ...prev, storageData: data }));
-  };
+  }, []);
   
-  const updateSecurityData = (data) => {
+  const updateSecurityData = useCallback((data) => {
     setFormData(prev => ({ ...prev, securityData: data }));
-  };
+  }, []);
   
-  const updateMeta = (updates) => {
+  // Memoized update handler for meta data to prevent unnecessary re-renders
+  const updateMeta = useCallback((updates) => {
     setMeta(prev => ({ ...prev, ...updates }));
-  };
+  }, []);
   
   // Handle PDF export
   const handlePDFExport = () => {
@@ -376,7 +386,7 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
       {activeTab === 'categories' && (
         <DataCategoriesTab
           categoryMatrix={formData.categoryMatrix}
-          onChange={(m) => setFormData((prev) => ({ ...prev, categoryMatrix: m }))}
+          onChange={handleCategoryMatrixChange}
         />
       )}
       
@@ -403,7 +413,7 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
       {/* Flow Diagram Modal */}
       <FlowDiagramModal
         isOpen={showDiagramModal}
-        onClose={() => setShowDiagramModal(false)}
+        onClose={handleDiagramModalClose}
         formData={formData}
         processes={processes}
         diagramData={diagramData}

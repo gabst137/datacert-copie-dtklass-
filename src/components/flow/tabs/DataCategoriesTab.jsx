@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, memo } from 'react';
 
 const HEADERS = [
   'Enumerare / Listing',
@@ -57,33 +57,38 @@ const DEFAULT_ROWS = [
 ];
 
 function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
-  // Local draft state to keep inputs stable while typing
+  // Keep a local draft so typing doesn't fight re-renders from parent
   const [draft, setDraft] = useState(() => ({ ...(categoryMatrix || {}) }));
-  const skipSyncRef = useRef(false);
+  const suppressPushRef = useRef(false);
+  const debounceRef = useRef(null);
 
-  // Sync external changes (e.g., switching flows) into local draft
+  // When parent provides new data (switch flow, load), sync into draft
   useEffect(() => {
-    if (skipSyncRef.current) {
-      // Skip the immediate sync triggered by our own onChange
-      skipSyncRef.current = false;
-      return;
-    }
+    suppressPushRef.current = true;
     setDraft({ ...(categoryMatrix || {}) });
   }, [categoryMatrix]);
 
+  // Debounced push of local draft to parent
+  useEffect(() => {
+    if (suppressPushRef.current) {
+      suppressPushRef.current = false;
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onChange && onChange(draft);
+    }, 250);
+    return () => clearTimeout(debounceRef.current);
+  }, [draft]);
+
   const updateCell = (rowId, field, value) => {
-    setDraft((prev) => {
-      const next = {
-        ...prev,
-        [rowId]: {
-          ...(prev[rowId] || {}),
-          [field]: value,
-        },
-      };
-      skipSyncRef.current = true;
-      onChange && onChange(next);
-      return next;
-    });
+    setDraft((prev) => ({
+      ...prev,
+      [rowId]: {
+        ...(prev[rowId] || {}),
+        [field]: value,
+      },
+    }));
   };
 
   // Keep track of expanded state for row dropdowns
@@ -117,9 +122,7 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
         legalBasis: ''
       }
     };
-    skipSyncRef.current = true;
     setDraft(next);
-    onChange && onChange(next);
     setOpen((m) => ({ ...m, [rowId]: true }));
     setMenuOpen(false);
   };
@@ -137,18 +140,14 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
         legalBasis: ''
       }
     };
-    skipSyncRef.current = true;
     setDraft(next);
-    onChange && onChange(next);
     setOpen((m) => ({ ...m, [id]: true }));
   };
 
   const removeCustomRow = (id) => {
     const next = { ...draft };
     delete next[id];
-    skipSyncRef.current = true;
     setDraft(next);
-    onChange && onChange(next);
   };
 
   const FieldRow = ({ rowId, field, label }) => {
@@ -261,9 +260,7 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
                           className="border border-gray-300 rounded-md px-2 py-1 text-xs"
                           onChange={(e) => {
                             const next = { ...draft, [row.id]: { ...(draft[row.id] || {}), __label: e.target.value } };
-                            skipSyncRef.current = true;
                             setDraft(next);
-                            onChange && onChange(next);
                           }}
                           value={draft[row.id]?.__label || ''}
                         />
@@ -316,4 +313,4 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
   );
 }
 
-export default DataCategoriesTab;
+export default memo(DataCategoriesTab);
