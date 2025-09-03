@@ -131,15 +131,15 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
     onChange && onChange(next);
   };
 
-  const Field = ({ rowId, field, label }) => {
+  const FieldRow = ({ rowId, field, label }) => {
     const value = (data[rowId] && data[rowId][field]) || '';
     const filled = String(value).trim().length > 0;
     return (
-      <div className="flex-1" style={{ minWidth: 220 }}>
-        <div className="text-xs text-gray-600" style={{ marginBottom: 4 }}>{label}</div>
-        <textarea
-          className={`w-full p-2 text-sm border rounded-md ${filled ? 'border-green-500 bg-white' : 'border-gray-300 bg-gray-50 text-gray-700'}`}
-          rows={3}
+      <div className="grid" style={{ gridTemplateColumns: 'minmax(220px, 38%) 1fr', gap: 12 }}>
+        <div className="text-sm text-gray-700" style={{ alignSelf: 'center' }}>{label}</div>
+        <input
+          type="text"
+          className={`w-full px-3 py-2 text-sm border rounded-md ${filled ? 'border-green-500 bg-white' : 'border-gray-300 bg-gray-50 text-gray-700'}`}
           value={value}
           onChange={(e) => updateCell(rowId, field, e.target.value)}
           placeholder="—"
@@ -217,15 +217,17 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
               </button>
 
               {open[row.id] && (
-                <div className="grid bg-gray-50 rounded-lg" style={{ padding: 14, border: '1px solid #e5e7eb', borderTop: '0', gridTemplateColumns: 'repeat(5, minmax(200px, 1fr))', gap: 14 }}>
-                  <Field rowId={row.id} field="enumerare" label={HEADERS[0]} />
-                  <Field rowId={row.id} field="method" label={HEADERS[1]} />
-                  <Field rowId={row.id} field="period" label={HEADERS[2]} />
-                  <Field rowId={row.id} field="storageOnly" label={HEADERS[3]} />
-                  <Field rowId={row.id} field="legalBasis" label={HEADERS[4]} />
+                <div className="bg-gray-50 rounded-lg" style={{ padding: 14, border: '1px solid #e5e7eb', borderTop: '0' }}>
+                  <div className="grid" style={{ gap: 12 }}>
+                    <FieldRow rowId={row.id} field="enumerare" label={HEADERS[0]} />
+                    <FieldRow rowId={row.id} field="method" label={HEADERS[1]} />
+                    <FieldRow rowId={row.id} field="period" label={HEADERS[2]} />
+                    <FieldRow rowId={row.id} field="storageOnly" label={HEADERS[3]} />
+                    <FieldRow rowId={row.id} field="legalBasis" label={HEADERS[4]} />
+                  </div>
 
                   {!defaultIds.has(row.id) && (
-                    <div className="flex items-center justify-between" style={{ gridColumn: '1 / -1', marginTop: 4 }}>
+                    <div className="flex items-center justify-between" style={{ marginTop: 12 }}>
                       <div className="text-xs text-gray-600">
                         Nume categorie: <strong>{label}</strong>
                       </div>
