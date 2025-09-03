@@ -1,0 +1,9 @@
+/* Keep index.css minimal to avoid layout conflicts with our app styles. */
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
