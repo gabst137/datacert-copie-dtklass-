@@ -57,20 +57,8 @@ const DEFAULT_ROWS = [
 ];
 
 function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
-  const initial = useMemo(() => {
-    const base = {};
-    DEFAULT_ROWS.forEach((r) => {
-      base[r.id] = {
-        enumerare: '',
-        method: '',
-        period: '',
-        storageOnly: '',
-        legalBasis: ''
-      };
-    });
-    return base;
-  }, []);
-
+  // Start with matrix provided from Firestore; do not prefill any defaults.
+  const initial = useMemo(() => ({}), []);
   const data = { ...initial, ...categoryMatrix };
 
   const updateCell = (rowId, field, value) => {
@@ -88,13 +76,37 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
   const [open, setOpen] = useState({});
   const toggle = (id) => setOpen((m) => ({ ...m, [id]: !m[id] }));
 
-  // Build list with defaults + any custom rows stored in matrix (keys not in DEFAULT_ROWS)
+  // Build list with ONLY currently selected rows (data), ordered with defaults first
   const defaultIds = new Set(DEFAULT_ROWS.map((r) => r.id));
-  const customRowEntries = Object.keys(categoryMatrix || {})
+  const selectedDefaultRows = DEFAULT_ROWS.filter((r) => data[r.id]).map((r) => ({ id: r.id, label: r.label }));
+  const customRowEntries = Object.keys(data)
     .filter((k) => !defaultIds.has(k))
-    .map((k) => ({ id: k, label: categoryMatrix[k]?.__label || 'Categorie personalizată' }));
+    .map((k) => ({ id: k, label: data[k]?.__label || 'Categorie personalizată' }));
 
-  const rows = [...DEFAULT_ROWS, ...customRowEntries];
+  const rows = [...selectedDefaultRows, ...customRowEntries];
+
+  // Dropdown menu for adding default rows
+  const [menuOpen, setMenuOpen] = useState(false);
+  const availableOptions = DEFAULT_ROWS.filter((r) => !data[r.id]);
+
+  const addDefaultRow = (rowId) => {
+    const rowDef = DEFAULT_ROWS.find((r) => r.id === rowId);
+    if (!rowDef) return;
+    const next = {
+      ...data,
+      [rowId]: {
+        __label: rowDef.label,
+        enumerare: '',
+        method: '',
+        period: '',
+        storageOnly: '',
+        legalBasis: ''
+      }
+    };
+    onChange && onChange(next);
+    setOpen((m) => ({ ...m, [rowId]: true }));
+    setMenuOpen(false);
+  };
 
   const addCustomRow = (label) => {
     const id = `custom_${Date.now()}`;
@@ -142,6 +154,30 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
     <div className="bg-white border border-gray-200 rounded-md p-4">
       <div className="text-sm font-medium" style={{ marginBottom: 12 }}>Categorii de date personale prelucrate</div>
 
+      {/* Picker for default categories */}
+      <div className="relative" style={{ marginBottom: 12 }}>
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          disabled={availableOptions.length === 0}
+          className="border border-gray-300 px-3 py-2 rounded-md text-sm bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {availableOptions.length ? 'Adaugă din listă' : 'Toate categoriile au fost adăugate'}
+        </button>
+        {menuOpen && availableOptions.length > 0 && (
+          <div className="absolute z-10 mt-2 w-full bg-white border border-gray-200 rounded-md shadow-md" style={{ maxHeight: 260, overflowY: 'auto' }}>
+            {availableOptions.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => addDefaultRow(opt.id)}
+                className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div>
         {rows.map((row) => {
           const label = defaultIds.has(row.id) ? row.label : (data[row.id]?.__label || row.label);
@@ -160,7 +196,16 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
                   </svg>
                   <span className="text-gray-900">{label}</span>
                 </div>
-                <span className="text-xs text-gray-600">{completedCount}/5 completate</span>
+                <div className="flex items-center" style={{ gap: 8 }}>
+                  <span className="text-xs text-gray-600">{completedCount}/5 completate</span>
+                  {/* Remove button for selected categories */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeCustomRow(row.id); }}
+                    className="text-xs border border-gray-300 rounded-md px-2 py-1 hover:bg-gray-50"
+                  >
+                    Elimină
+                  </button>
+                </div>
               </button>
 
               {open[row.id] && (
