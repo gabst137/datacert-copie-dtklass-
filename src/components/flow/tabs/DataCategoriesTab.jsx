@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 
 const HEADERS = [
   'Enumerare / Listing',
@@ -57,19 +57,33 @@ const DEFAULT_ROWS = [
 ];
 
 function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
-  // Start with matrix provided from Firestore; do not prefill any defaults.
-  const initial = useMemo(() => ({}), []);
-  const data = { ...initial, ...categoryMatrix };
+  // Local draft state to keep inputs stable while typing
+  const [draft, setDraft] = useState(() => ({ ...(categoryMatrix || {}) }));
+  const skipSyncRef = useRef(false);
+
+  // Sync external changes (e.g., switching flows) into local draft
+  useEffect(() => {
+    if (skipSyncRef.current) {
+      // Skip the immediate sync triggered by our own onChange
+      skipSyncRef.current = false;
+      return;
+    }
+    setDraft({ ...(categoryMatrix || {}) });
+  }, [categoryMatrix]);
 
   const updateCell = (rowId, field, value) => {
-    const next = {
-      ...data,
-      [rowId]: {
-        ...data[rowId],
-        [field]: value
-      }
-    };
-    onChange && onChange(next);
+    setDraft((prev) => {
+      const next = {
+        ...prev,
+        [rowId]: {
+          ...(prev[rowId] || {}),
+          [field]: value,
+        },
+      };
+      skipSyncRef.current = true;
+      onChange && onChange(next);
+      return next;
+    });
   };
 
   // Keep track of expanded state for row dropdowns
@@ -78,22 +92,22 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
 
   // Build list with ONLY currently selected rows (data), ordered with defaults first
   const defaultIds = new Set(DEFAULT_ROWS.map((r) => r.id));
-  const selectedDefaultRows = DEFAULT_ROWS.filter((r) => data[r.id]).map((r) => ({ id: r.id, label: r.label }));
-  const customRowEntries = Object.keys(data)
+  const selectedDefaultRows = DEFAULT_ROWS.filter((r) => draft[r.id]).map((r) => ({ id: r.id, label: r.label }));
+  const customRowEntries = Object.keys(draft)
     .filter((k) => !defaultIds.has(k))
-    .map((k) => ({ id: k, label: data[k]?.__label || 'Categorie personalizată' }));
+    .map((k) => ({ id: k, label: draft[k]?.__label || 'Categorie personalizată' }));
 
   const rows = [...selectedDefaultRows, ...customRowEntries];
 
   // Dropdown menu for adding default rows
   const [menuOpen, setMenuOpen] = useState(false);
-  const availableOptions = DEFAULT_ROWS.filter((r) => !data[r.id]);
+  const availableOptions = DEFAULT_ROWS.filter((r) => !draft[r.id]);
 
   const addDefaultRow = (rowId) => {
     const rowDef = DEFAULT_ROWS.find((r) => r.id === rowId);
     if (!rowDef) return;
     const next = {
-      ...data,
+      ...draft,
       [rowId]: {
         __label: rowDef.label,
         enumerare: '',
@@ -103,6 +117,8 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
         legalBasis: ''
       }
     };
+    skipSyncRef.current = true;
+    setDraft(next);
     onChange && onChange(next);
     setOpen((m) => ({ ...m, [rowId]: true }));
     setMenuOpen(false);
@@ -111,7 +127,7 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
   const addCustomRow = (label) => {
     const id = `custom_${Date.now()}`;
     const next = {
-      ...data,
+      ...draft,
       [id]: {
         __label: label || 'Categorie personalizată',
         enumerare: '',
@@ -121,18 +137,22 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
         legalBasis: ''
       }
     };
+    skipSyncRef.current = true;
+    setDraft(next);
     onChange && onChange(next);
     setOpen((m) => ({ ...m, [id]: true }));
   };
 
   const removeCustomRow = (id) => {
-    const next = { ...data };
+    const next = { ...draft };
     delete next[id];
+    skipSyncRef.current = true;
+    setDraft(next);
     onChange && onChange(next);
   };
 
   const FieldRow = ({ rowId, field, label }) => {
-    const value = (data[rowId] && data[rowId][field]) || '';
+    const value = (draft[rowId] && draft[rowId][field]) || '';
     const filled = String(value).trim().length > 0;
     return (
       <div className="grid" style={{ gridTemplateColumns: 'minmax(220px, 38%) 1fr', gap: 12 }}>
@@ -186,8 +206,8 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
 
       <div>
         {rows.map((row) => {
-          const label = defaultIds.has(row.id) ? row.label : (data[row.id]?.__label || row.label);
-          const rowData = data[row.id] || {};
+          const label = defaultIds.has(row.id) ? row.label : (draft[row.id]?.__label || row.label);
+          const rowData = draft[row.id] || {};
           const completedCount = ['enumerare','method','period','storageOnly','legalBasis']
             .reduce((acc, k) => acc + (rowData[k] && String(rowData[k]).trim() ? 1 : 0), 0);
           return (
@@ -240,10 +260,12 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
                           placeholder="Redenumește categoria"
                           className="border border-gray-300 rounded-md px-2 py-1 text-xs"
                           onChange={(e) => {
-                            const next = { ...data, [row.id]: { ...data[row.id], __label: e.target.value } };
+                            const next = { ...draft, [row.id]: { ...(draft[row.id] || {}), __label: e.target.value } };
+                            skipSyncRef.current = true;
+                            setDraft(next);
                             onChange && onChange(next);
                           }}
-                          value={data[row.id]?.__label || ''}
+                          value={draft[row.id]?.__label || ''}
                         />
                         <button onClick={() => removeCustomRow(row.id)} className="text-xs border border-gray-300 rounded-md px-2 py-1 hover:bg-gray-50">Șterge</button>
                       </div>
