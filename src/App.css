@@ -666,3 +666,9 @@ input:focus {
   outline: none;
   box-shadow: 0 0 0 3px rgb(99 102 241 / 0.3);
 }
+
+/* Small utility additions for redesigned header/tabs */
+.p-2 { padding: 0.5rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.text-indigo-700 { color: #4338ca; }
+.border-indigo-400 { border-color: #818cf8; }

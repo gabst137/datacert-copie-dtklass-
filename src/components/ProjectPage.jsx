@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
+import { deleteFlowStorage } from '../utils/storageCleanup';
 
 function ProjectPage({ project: projectProp, onBack, onOpenFlow }) {
   const { currentUser } = useAuth();
@@ -92,6 +93,8 @@ function ProjectPage({ project: projectProp, onBack, onOpenFlow }) {
     const ok = window.confirm(`Delete flow "${flow.flowName || 'Untitled flow'}"?`);
     if (!ok) return;
     try {
+      // Best-effort storage cleanup first
+      await deleteFlowStorage(currentUser.uid, flow.id);
       await deleteDoc(doc(db, `companies/${currentUser.uid}/projects/${projectId}/flows/${flow.id}`));
     } catch (err) {
       console.error('Failed to delete flow', err);

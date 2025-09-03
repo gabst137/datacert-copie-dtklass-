@@ -116,11 +116,13 @@ function DocumentUploader({
     }
   };
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     multiple: true,
     maxSize: 10485760, // 10MB
-    accept: acceptedTypes
+    accept: acceptedTypes,
+    noClick: true,
+    noKeyboard: true,
   });
 
   return (
@@ -128,14 +130,13 @@ function DocumentUploader({
       <div className="mb-4 flex gap-2">
         <button
           type="button"
-          {...getRootProps()}
+          onClick={open}
           className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
           disabled={uploading}
         >
-          <input {...getInputProps()} />
           Select. fisiere
         </button>
-        
+
         <div
           {...getRootProps()}
           className={`flex-1 border-2 border-dashed rounded-md px-4 py-2 text-center cursor-pointer transition-colors ${
@@ -148,7 +149,8 @@ function DocumentUploader({
           ) : isDragActive ? (
             <span className="text-sm text-indigo-600">Drop files here...</span>
           ) : (
-            <span className="text-sm text-gray-600">Upload (drag & drop or click)</span>
+            <span className="text-sm text-gray-600">Upload (drag & drop or click)
+            </span>
           )}
         </div>
       </div>

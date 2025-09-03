@@ -28,7 +28,7 @@ function GeneralDataTab({
     <div className="bg-white border border-gray-200 rounded-md p-6">
       {/* Status Badges and Actions */}
       <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <span className={`px-3 py-1 rounded-full text-sm font-medium ${
             status === 'Aprobat' 
               ? 'bg-green-100 text-green-800' 
@@ -52,7 +52,7 @@ function GeneralDataTab({
         
         <button
           type="button"
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+          className="inline-flex items-center h-10 px-4 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm hover:bg-indigo-50 hover:border-indigo-300"
           onClick={() => {
             // Clone flow functionality - will be implemented in parent
             console.log('Clone flow');

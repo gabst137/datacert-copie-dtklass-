@@ -1,5 +1,5 @@
 // src/components/FlowPage.jsx
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { doc, getDoc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,7 +22,11 @@ function Tab({ id, active, onClick, children }) {
   return (
     <button
       onClick={() => onClick(id)}
-      className={`px-4 py-2 text-sm border-b-2 ${active ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-600 hover:text-gray-800'}`}
+      className={`mr-2 mb-2 px-4 py-2 text-sm rounded-md border transition-colors ${
+        active
+          ? 'border-indigo-400 text-indigo-700 shadow-sm bg-white'
+          : 'border-gray-300 text-gray-700 hover:bg-gray-50 bg-white'
+      }`}
     >
       {children}
     </button>
@@ -34,9 +38,10 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
   const params = useParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saveTimer, setSaveTimer] = useState(null);
   const [lastSaved, setLastSaved] = useState(null);
   const [showDiagramModal, setShowDiagramModal] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
   
   // Meta information
   const [meta, setMeta] = useState({ 
@@ -130,7 +135,7 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
     load();
   }, [currentUser, projectId, flowId]);
 
-  // Auto-save functionality with debouncing
+  // Manual save only (auto-save disabled)
   const handleSave = useCallback(async () => {
     if (!currentUser || !projectId || !flowId) return;
     try {
@@ -149,26 +154,9 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
     } finally {
       setSaving(false);
     }
-  }, [currentUser, projectId, flowId, meta, formData, processes]);
+  }, [currentUser, projectId, flowId, meta, formData, processes, diagramData]);
   
-  // Trigger auto-save on data changes
-  useEffect(() => {
-    if (loading) return;
-    
-    // Clear existing timer
-    if (saveTimer) clearTimeout(saveTimer);
-    
-    // Set new timer for auto-save (2 seconds delay)
-    const timer = setTimeout(() => {
-      handleSave();
-    }, 2000);
-    
-    setSaveTimer(timer);
-    
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [meta, formData, processes, diagramData]);
+  // Note: auto-save intentionally disabled for better control
   
   // Clone flow functionality
   async function handleCloneFlow() {
@@ -237,6 +225,17 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
     }
   };
 
+  // Close the actions menu on outside click
+  useEffect(() => {
+    function onDocClick(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [menuOpen]);
+
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto py-8 px-4 text-gray-600">Loading flow...</div>
@@ -245,7 +244,7 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
 
   return (
     <div className="max-w-6xl mx-auto py-6 px-4">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{meta.flowName || 'Flow'}</h1>
           <p className="text-gray-600">
@@ -257,61 +256,80 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {onBack && (
-            <button onClick={onBack} className="border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-50">Back</button>
-          )}
-          <button 
-            onClick={() => setShowDiagramModal(true)}
-            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-50 flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            View Diagram
-          </button>
-          <button 
-            onClick={handlePDFExport}
-            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-50 flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            Export PDF
-          </button>
-          <button 
-            onClick={handleCloneFlow} 
-            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-50"
-          >
-            Clone Flow
-          </button>
-          <button 
-            onClick={handleSave} 
-            disabled={saving} 
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50 flex items-center gap-2"
-          >
-            {saving ? (
-              <>
-                <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
-                Saving...
-              </>
-            ) : (
-              'Salveaza'
+        <div className="flex items-center">
+          <div className="ml-0 mr-2">
+            <button 
+              onClick={handleSave} 
+              disabled={saving} 
+              className="inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            >
+              {saving ? (
+                <>
+                  <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                  Saving...
+                </>
+              ) : (
+                'Salveaza'
+              )}
+            </button>
+          </div>
+          <div className="relative" ref={menuRef}>
+            <button
+              aria-label="More actions"
+              onClick={() => setMenuOpen((v) => !v)}
+              className="inline-flex items-center h-10 px-3 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm hover:bg-gray-50"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              Actiuni
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-md overflow-hidden" style={{ zIndex: 20 }}>
+                {onBack && (
+                  <button
+                    onClick={() => { setMenuOpen(false); onBack(); }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                  >
+                    Inapoi
+                  </button>
+                )}
+                <button
+                  onClick={() => { setMenuOpen(false); setShowDiagramModal(true); }}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                >
+                  Vizualizeaza diagrama
+                </button>
+                <button
+                  onClick={() => { setMenuOpen(false); handlePDFExport(); }}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                >
+                  Exporta PDF
+                </button>
+                <button
+                  onClick={() => { setMenuOpen(false); handleCloneFlow(); }}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                >
+                  Cloneaza flux
+                </button>
+              </div>
             )}
-          </button>
+          </div>
         </div>
       </div>
 
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-4 flex gap-2 flex-wrap">
-        <Tab id="general" active={activeTab === 'general'} onClick={setActiveTab}>Date generale</Tab>
-        <Tab id="people" active={activeTab === 'people'} onClick={setActiveTab}>Persoane vizate</Tab>
-        <Tab id="legal" active={activeTab === 'legal'} onClick={setActiveTab}>Detalii temei legal</Tab>
-        <Tab id="processing" active={activeTab === 'processing'} onClick={setActiveTab}>Prelucrare date</Tab>
-        <Tab id="categories" active={activeTab === 'categories'} onClick={setActiveTab}>Categorii date</Tab>
-        <Tab id="storage" active={activeTab === 'storage'} onClick={setActiveTab}>Stocare date</Tab>
-        <Tab id="security" active={activeTab === 'security'} onClick={setActiveTab}>Securitate</Tab>
+      <div className="mb-4">
+        <div className="bg-white border border-gray-200 rounded-md p-2 flex flex-wrap">
+          <Tab id="general" active={activeTab === 'general'} onClick={setActiveTab}>Date generale</Tab>
+          <Tab id="people" active={activeTab === 'people'} onClick={setActiveTab}>Persoane vizate</Tab>
+          <Tab id="legal" active={activeTab === 'legal'} onClick={setActiveTab}>Detalii temei legal</Tab>
+          <Tab id="processing" active={activeTab === 'processing'} onClick={setActiveTab}>Prelucrare date</Tab>
+          <Tab id="categories" active={activeTab === 'categories'} onClick={setActiveTab}>Categorii date</Tab>
+          <Tab id="storage" active={activeTab === 'storage'} onClick={setActiveTab}>Stocare date</Tab>
+          <Tab id="security" active={activeTab === 'security'} onClick={setActiveTab}>Securitate</Tab>
+        </div>
       </div>
 
       {/* Tab Content */}

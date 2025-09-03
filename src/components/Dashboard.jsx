@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
+import { deleteFlowStorage } from '../utils/storageCleanup';
 
 function Dashboard({ onOpenProject, onOpenFlow }) {
   const [projects, setProjects] = useState([]);
@@ -126,10 +127,15 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
     const ok = window.confirm(`Delete project "${project.projectName}" and all its flows?`);
     if (!ok) return;
     try {
-      // delete all flows under project
+      // delete all flows under project (docs + storage)
       const flowsCol = collection(db, `companies/${currentUser.uid}/projects/${pid}/flows`);
       const snap = await getDocs(flowsCol);
-      await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+      await Promise.all(
+        snap.docs.map(async (d) => {
+          await deleteFlowStorage(currentUser.uid, d.id);
+          await deleteDoc(d.ref);
+        })
+      );
       // delete the project doc
       await deleteDoc(doc(db, `companies/${currentUser.uid}/projects/${pid}`));
     } catch (e) {
@@ -167,6 +173,7 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
     const ok = window.confirm(`Delete flow "${flow.flowName}"?`);
     if (!ok) return;
     try {
+      await deleteFlowStorage(currentUser.uid, flow.id);
       await deleteDoc(doc(db, `companies/${currentUser.uid}/projects/${project.id}/flows/${flow.id}`));
     } catch (e) {
       console.error('Failed to delete flow', e);
