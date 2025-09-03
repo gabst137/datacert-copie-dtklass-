@@ -192,8 +192,11 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
             .reduce((acc, k) => acc + (rowData[k] && String(rowData[k]).trim() ? 1 : 0), 0);
           return (
             <div key={row.id} className="rounded-lg" style={{ marginBottom: 16 }}>
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => toggle(row.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(row.id); } }}
                 className="w-full flex items-center justify-between px-4 py-3 text-sm bg-white rounded-lg shadow-sm"
                 style={{ border: '2px solid #e5e7eb' }}
               >
@@ -214,7 +217,7 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
                     Elimină
                   </button>
                 </div>
-              </button>
+              </div>
 
               {open[row.id] && (
                 <div className="bg-gray-50 rounded-lg" style={{ padding: 14, border: '1px solid #e5e7eb', borderTop: '0' }}>
