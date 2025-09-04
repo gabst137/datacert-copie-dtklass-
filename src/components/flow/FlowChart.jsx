@@ -47,297 +47,175 @@ const generateFlowChart = (formData, processes = []) => {
       style: { stroke: '#6366f1' }
     });
   };
-  
-  // Layout positions
-  let xPos = 50;
-  let yPos = 50;
-  const xSpacing = 250;
-  const ySpacing = 120;
-  
-  // Step 0: Internal departments (most logical start)
-  const internalDeptNodeIds = [];
-  if (formData.generalData?.internalFlow && Object.keys(formData.generalData.internalFlow).length > 0) {
-    const entries = Object.entries(formData.generalData.internalFlow)
-      .filter(([, v]) => v && (v.departmentName || v.accessMode));
-    entries.forEach(([key, v], index) => {
-      const nodeId = createNode(
-        'entity',
-        v.departmentName || v.__label || `Departament ${index + 1}`,
-        { x: xPos, y: yPos + (index * 80) },
-        { subLabel: v.accessMode ? `Acces: ${v.accessMode}` : 'Internal department' }
-      );
-      internalDeptNodeIds.push(nodeId);
-    });
-    if (internalDeptNodeIds.length > 0) xPos += xSpacing;
-  }
 
-  // Step 1: Create entity nodes for people categories (legacy fallback)
-  const peopleNodeIds = [];
-  if (formData.peopleData?.categories?.length > 0) {
-    formData.peopleData.categories.forEach((category, index) => {
-      const nodeId = createNode(
-        'entity',
-        category,
-        { x: xPos, y: yPos + (index * 80) },
-        { subLabel: 'Data Subject' }
-      );
-      peopleNodeIds.push(nodeId);
-    });
-    xPos += xSpacing;
-  }
+  // Layout configuration for 7-tab structure
+  const mainTabSpacing = 300;
+  const subItemSpacing = 180;
+  const startX = 100;
+  const startY = 100;
   
-  // Step 2: Create collection/input node if notification methods exist (legacy)
-  let collectionNodeId = null;
-  if (formData.peopleData?.notificationMethods?.length > 0) {
-    collectionNodeId = createNode(
-      'transfer',
-      'Data Collection',
-      { x: xPos, y: yPos + 40 },
-      { method: formData.peopleData.notificationMethods.join(', ') }
+  let currentX = startX;
+  
+  // Helper to sanitize user input to prevent XSS attacks
+  const sanitizeInput = (input) => {
+    if (!input) return '';
+    return String(input).replace(/[<>'"&]/g, (match) => {
+      const htmlEntities = { '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;', '&': '&amp;' };
+      return htmlEntities[match] || match;
+    });
+  };
+
+  // Helper to create sub-nodes for a main category
+  const createCategoryWithSubItems = (mainTitle, dataObject, mainNodeType, subNodeType, x, y) => {
+    if (!dataObject || typeof dataObject !== 'object' || Object.keys(dataObject).length === 0) return [];
+    
+    const createdNodes = [];
+    
+    // Create main category node with sanitized title
+    const mainNodeId = createNode(
+      mainNodeType,
+      sanitizeInput(mainTitle),
+      { x, y },
+      { subLabel: `${Object.keys(dataObject).length} items` }
     );
+    createdNodes.push(mainNodeId);
     
-    // Connect upstream (internal departments preferred, then people subjects)
-    const upstream = internalDeptNodeIds.length > 0 ? internalDeptNodeIds : peopleNodeIds;
-    upstream.forEach(srcId => {
-      createEdge(srcId, collectionNodeId, 'Provides');
-    });
-    
-    xPos += xSpacing;
-  }
-  
-  // Step 3: Create process nodes
-  const processNodeIds = [];
-  if (processes && processes.length > 0) {
-    processes.forEach((process, index) => {
-      const nodeId = createNode(
-        'process',
-        process.name || 'Process',
-        { x: xPos, y: yPos + (index * 100) },
-        { activities: process.activities || [] }
-      );
-      processNodeIds.push(nodeId);
+    // Create sub-nodes for each data item with proper null checking
+    const entries = Object.entries(dataObject).filter(([, v]) => v && typeof v === 'object');
+    entries.forEach(([key, value], index) => {
+      const subY = y + 120 + (index * subItemSpacing);
       
-      // Connect from collection or people
-      if (collectionNodeId) {
-        createEdge(collectionNodeId, nodeId, 'Input');
-      } else if (internalDeptNodeIds.length > 0) {
-        createEdge(internalDeptNodeIds[0], nodeId, 'Data');
-      } else if (peopleNodeIds.length > 0) {
-        createEdge(peopleNodeIds[0], nodeId, 'Data');
-      }
+      // Create bullet points from filled fields with sanitization
+      const bulletPoints = [];
+      if (value.enumerare) bulletPoints.push(`Enumerare: ${sanitizeInput(value.enumerare)}`);
+      if (value.relevantDocs) bulletPoints.push(`Documente: ${sanitizeInput(value.relevantDocs)}`);
+      if (value.method) bulletPoints.push(`Method: ${sanitizeInput(value.method)}`);
+      if (value.period) bulletPoints.push(`Period: ${sanitizeInput(value.period)}`);
+      if (value.storageOnly) bulletPoints.push(`Storage: ${sanitizeInput(value.storageOnly)}`);
+      if (value.legalBasis) bulletPoints.push(`Legal Basis: ${sanitizeInput(value.legalBasis)}`);
+      if (value.recipient) bulletPoints.push(`Recipient: ${sanitizeInput(value.recipient)}`);
+      if (value.category) bulletPoints.push(`Category: ${sanitizeInput(value.category)}`);
+      if (value.destState) bulletPoints.push(`State: ${sanitizeInput(value.destState)}`);
+      if (value.transferType) bulletPoints.push(`Transfer: ${sanitizeInput(value.transferType)}`);
+      
+      // Sanitize node label
+      const nodeLabel = sanitizeInput(value.__label || value.name) || `Item ${index + 1}`;
+      
+      const subNodeId = createNode(
+        subNodeType,
+        nodeLabel,
+        { x, y: subY },
+        { items: bulletPoints.length > 0 ? bulletPoints : ['Selected item'] }
+      );
+      
+      createdNodes.push(subNodeId);
+      
+      // Connect sub-node to main node
+      createEdge(mainNodeId, subNodeId, 'Contains');
     });
-  } else if (formData.processingData?.purposes?.length > 0) {
-    // Create a general processing node if no specific processes
-    const nodeId = createNode(
+    
+    return createdNodes;
+  };
+
+  // Create the 7 main category sections
+  const allCreatedNodes = [];
+  
+  // 1. Flux intern (Internal Flow)
+  if (formData.generalData?.internalFlow) {
+    const nodes = createCategoryWithSubItems(
+      'Flux intern',
+      formData.generalData.internalFlow,
+      'entity',
       'process',
-      'Data Processing',
-      { x: xPos, y: yPos + 40 },
-      { activities: formData.processingData.purposes }
+      currentX,
+      startY
     );
-    processNodeIds.push(nodeId);
-    
-    if (collectionNodeId) {
-      createEdge(collectionNodeId, nodeId, 'Process');
-    } else if (internalDeptNodeIds.length > 0) {
-      createEdge(internalDeptNodeIds[0], nodeId, 'Data');
-    } else if (peopleNodeIds.length > 0) {
-      createEdge(peopleNodeIds[0], nodeId, 'Data');
-    }
+    allCreatedNodes.push(...nodes);
+    if (nodes.length > 0) currentX += mainTabSpacing;
   }
   
-  if (processNodeIds.length > 0) {
-    xPos += xSpacing;
+  // 2. Flux extern (SEE) - External SEE transfers
+  if (formData.peopleData?.externalSEE) {
+    const nodes = createCategoryWithSubItems(
+      'Flux extern (SEE)',
+      formData.peopleData.externalSEE,
+      'transfer',
+      'entity',
+      currentX,
+      startY
+    );
+    allCreatedNodes.push(...nodes);
+    if (nodes.length > 0) currentX += mainTabSpacing;
   }
   
-  // Step 4: Create storage node
-  let storageNodeId = null;
-  if (formData.storageData?.policy || formData.storageData?.duration) {
-    const duration = formData.storageData.duration 
-      ? `${formData.storageData.duration.value} ${formData.storageData.duration.unit}`
-      : 'Defined period';
-      
-    storageNodeId = createNode(
-      'storage',
-      'Data Storage',
-      { x: xPos, y: yPos + 40 },
-      { duration }
+  // 3. Transfer state terte - Third country transfers
+  if (formData.legalData?.thirdCountries) {
+    const nodes = createCategoryWithSubItems(
+      'Transfer state terte',
+      formData.legalData.thirdCountries,
+      'transfer',
+      'entity',
+      currentX,
+      startY
     );
-    
-    // Connect processes to storage
-    if (processNodeIds.length > 0) {
-      processNodeIds.forEach(processId => {
-        createEdge(processId, storageNodeId, 'Store');
-      });
-    } else if (collectionNodeId) {
-      createEdge(collectionNodeId, storageNodeId, 'Store');
-    }
-    
-    xPos += xSpacing;
+    allCreatedNodes.push(...nodes);
+    if (nodes.length > 0) currentX += mainTabSpacing;
   }
-
-  // Step 5: Create Data Categories node from matrix (if present) with labels
+  
+  // 4. Prelucrare date - Processing data (special categories)
+  if (formData.processingData?.specialCategories) {
+    const nodes = createCategoryWithSubItems(
+      'Prelucrare date',
+      formData.processingData.specialCategories,
+      'process',
+      'data',
+      currentX,
+      startY
+    );
+    allCreatedNodes.push(...nodes);
+    if (nodes.length > 0) currentX += mainTabSpacing;
+  }
+  
+  // 5. Categorii date - Data categories matrix
   if (formData.categoryMatrix) {
-    const labelMap = {
-      idData: 'ID data',
-      contactData: 'Contact data',
-      educationData: 'Education/certifications',
-      personalLife: 'Personal life data',
-      economic: 'Economic/financial',
-      professional: 'Professional activity',
-      media: 'Photos/videos/voice',
-      connection: 'Connection data',
-      location: 'Location data',
-      identityNumbers: 'ID numbers (CNP etc.)',
-      other: 'Other',
-    };
-    const items = Object.entries(formData.categoryMatrix)
-      .filter(([, v]) => v && (v.enumerare || v.method || v.period || v.storageOnly || v.legalBasis))
-      .map(([k, v]) => v?.__label || labelMap[k] || k);
-    if (items.length > 0) {
-      const dataNodeId = createNode(
-        'data',
-        'Categorii date',
-        { x: Math.max(50, xPos - 125), y: yPos + 220 },
-        { items }
-      );
-      // connect to process nodes or storage if available
-      if (processNodeIds.length > 0) {
-        processNodeIds.forEach(pid => createEdge(dataNodeId, pid, 'Date'));
-      } else if (storageNodeId) {
-        createEdge(dataNodeId, storageNodeId, 'Date');
-      }
-    }
-  }
-
-  // Step 5b: Create Processing Special Categories node (lines inside)
-  if (formData.processingData?.specialCategories && Object.keys(formData.processingData.specialCategories).length > 0) {
-    const lines = Object.entries(formData.processingData.specialCategories)
-      .filter(([, v]) => v && (v.enumerare || v.method || v.period || v.storageOnly || v.legalBasis || v.__label))
-      .map(([k, v]) => v?.__label || k);
-    if (lines.length > 0) {
-      const specNodeId = createNode(
-        'process',
-        'Prelucrare date',
-        { x: Math.max(50, xPos - 125), y: yPos + 80 },
-        { lines }
-      );
-      // connect upstream: internal dept/collection/people
-      const upstream = internalDeptNodeIds.length > 0 ? internalDeptNodeIds : (collectionNodeId ? [collectionNodeId] : peopleNodeIds);
-      upstream.forEach(srcId => createEdge(srcId, specNodeId, 'Date'));
-      // connect to storage and processes if available
-      if (processNodeIds.length > 0) {
-        processNodeIds.forEach(pid => createEdge(specNodeId, pid, 'Procesare'));
-      }
-      if (storageNodeId) {
-        createEdge(specNodeId, storageNodeId, 'Store');
-      }
-    }
-  }
-
-  // Step 6: Create recipient/transfer nodes (legacy arrays)
-  const recipientCategories = [
-    ...(formData.processingData?.recipientCategories || []),
-    ...(formData.storageData?.recipientCategories || [])
-  ];
-  
-  if (recipientCategories.length > 0) {
-    const uniqueRecipients = [...new Set(recipientCategories)];
-    
-    uniqueRecipients.forEach((recipient, index) => {
-      const nodeId = createNode(
-        'entity',
-        recipient,
-        { x: xPos, y: yPos + (index * 80) },
-        { subLabel: 'Data Recipient' }
-      );
-      
-      // Connect from storage or processes
-      if (storageNodeId) {
-        createEdge(storageNodeId, nodeId, 'Transfer');
-      } else if (processNodeIds.length > 0) {
-        createEdge(processNodeIds[processNodeIds.length - 1], nodeId, 'Share');
-      }
-    });
-  }
-
-  // Step 6b: External SEE transfers (new matrix)
-  if (formData.peopleData?.externalSEE && Object.keys(formData.peopleData.externalSEE).length > 0) {
-    const entries = Object.entries(formData.peopleData.externalSEE)
-      .filter(([, v]) => v && (v.recipient || v.category || v.destState || v.legalBasis || v.transferType));
-    entries.forEach(([key, v], index) => {
-      const method = [
-        v.destState ? `State: ${v.destState}` : null,
-        v.legalBasis ? `Basis: ${v.legalBasis}` : null,
-        v.transferType ? `Type: ${v.transferType}` : null,
-        v.category ? `Cat: ${v.category}` : null,
-      ].filter(Boolean).join(' • ');
-      const nodeId = createNode(
-        'transfer',
-        v.__label || v.recipient || `SEE recipient ${index + 1}`,
-        { x: xPos, y: yPos + (index * 90) },
-        { method }
-      );
-      if (storageNodeId) {
-        createEdge(storageNodeId, nodeId, 'SEE Transfer');
-      } else if (processNodeIds.length > 0) {
-        createEdge(processNodeIds[processNodeIds.length - 1], nodeId, 'SEE Transfer');
-      }
-    });
-    xPos += xSpacing;
-  }
-
-  // Step 6c: Third-country/international organisation transfers (new matrix)
-  if (formData.legalData?.thirdCountries && Object.keys(formData.legalData.thirdCountries).length > 0) {
-    const baseX = Math.max(50, xPos);
-    const entries = Object.entries(formData.legalData.thirdCountries)
-      .filter(([, v]) => v && (v.recipient || v.category || v.destState || v.legalBasis || v.transferType));
-    entries.forEach(([key, v], index) => {
-      const method = [
-        v.destState ? `State: ${v.destState}` : null,
-        v.legalBasis ? `Basis: ${v.legalBasis}` : null,
-        v.transferType ? `Type: ${v.transferType}` : null,
-        v.category ? `Cat: ${v.category}` : null,
-      ].filter(Boolean).join(' • ');
-      const nodeId = createNode(
-        'transfer',
-        v.__label || v.recipient || `Third-country recipient ${index + 1}`,
-        { x: baseX, y: yPos + (index * 90) },
-        { method }
-      );
-      if (storageNodeId) {
-        createEdge(storageNodeId, nodeId, 'Third-country Transfer');
-      } else if (processNodeIds.length > 0) {
-        createEdge(processNodeIds[processNodeIds.length - 1], nodeId, 'Third-country Transfer');
-      }
-    });
-  }
-  
-  // Step 7: Add security node if security measures exist (matrix or legacy)
-  if ((formData.securityData?.matrix && Object.keys(formData.securityData.matrix).length > 0) ||
-      formData.securityData?.technicalMeasures?.length > 0 || 
-      formData.securityData?.organizationalMeasures?.length > 0) {
-    const matrixMeasures = formData.securityData?.matrix
-      ? Object.values(formData.securityData.matrix)
-          .filter((v) => v && (v.enumerare || v.relevantDocs))
-          .map((v) => v.enumerare || v.__label)
-      : [];
-    const measures = [
-      ...matrixMeasures,
-      ...(formData.securityData.technicalMeasures || []),
-      ...(formData.securityData.organizationalMeasures || [])
-    ].filter(Boolean);
-    
-    const securityNodeId = createNode(
-      'security',
-      'Security Measures',
-      { x: xPos / 2, y: yPos + ySpacing + 50 },
-      { measures }
+    const nodes = createCategoryWithSubItems(
+      'Categorii date',
+      formData.categoryMatrix,
+      'data',
+      'data',
+      currentX,
+      startY
     );
-    
-    // Connect security to storage
-    if (storageNodeId) {
-      createEdge(securityNodeId, storageNodeId, 'Protects');
-    }
+    allCreatedNodes.push(...nodes);
+    if (nodes.length > 0) currentX += mainTabSpacing;
+  }
+  
+  // 6. Stocare date - Storage data
+  if (formData.storageData?.matrix) {
+    const nodes = createCategoryWithSubItems(
+      'Stocare date',
+      formData.storageData.matrix,
+      'storage',
+      'storage',
+      currentX,
+      startY
+    );
+    allCreatedNodes.push(...nodes);
+    if (nodes.length > 0) currentX += mainTabSpacing;
+  }
+  
+  // 7. Securitate - Security measures matrix
+  if (formData.securityData?.matrix) {
+    const nodes = createCategoryWithSubItems(
+      'Securitate',
+      formData.securityData.matrix,
+      'security',
+      'security',
+      currentX,
+      startY
+    );
+    allCreatedNodes.push(...nodes);
+    if (nodes.length > 0) currentX += mainTabSpacing;
   }
   
   return { nodes, edges };
@@ -350,7 +228,8 @@ function FlowChart({
   onDiagramChange,
   flowId,
   projectId,
-  userId 
+  userId,
+  fullHeight = false
 }) {
   const notify = useNotify();
   const [nodes, setNodes] = useState([]);
@@ -472,9 +351,15 @@ function FlowChart({
         }
       })
         .then((dataUrl) => {
+          // Sanitize filename to prevent path traversal attacks
+          const sanitizeFilename = (name) => {
+            if (!name) return 'diagram';
+            return String(name).replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
+          };
+          
           const a = document.createElement('a');
           a.href = dataUrl;
-          a.download = `flowchart_${flowId || 'diagram'}.png`;
+          a.download = `flowchart_${sanitizeFilename(flowId)}.png`;
           a.click();
         })
         .catch((err) => {
@@ -506,7 +391,12 @@ function FlowChart({
   };
   
   return (
-    <div className="w-full bg-white border border-gray-200 rounded-lg" style={{ height: '60vh', minHeight: 520 }}>
+    <div
+      className={
+        `w-full ${fullHeight ? 'h-full' : ''} ${fullHeight ? '' : 'bg-white border border-gray-200 rounded-lg'}`
+      }
+      style={fullHeight ? { height: '100%', minHeight: 520 } : { height: '60vh', minHeight: 520 }}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}

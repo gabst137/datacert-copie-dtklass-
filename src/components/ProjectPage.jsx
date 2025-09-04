@@ -1,16 +1,17 @@
 // src/components/ProjectPage.jsx
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
 import { deleteFlowStorage } from '../utils/storageCleanup';
 import { useNotify } from '../contexts/NotificationContext';
 
-function ProjectPage({ project: projectProp, onBack, onOpenFlow }) {
+function ProjectPage({ project: projectProp }) {
   const { currentUser } = useAuth();
   const notify = useNotify();
   const params = useParams();
+  const navigate = useNavigate();
   const [project, setProject] = useState(projectProp || null);
   const [flows, setFlows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -78,7 +79,17 @@ function ProjectPage({ project: projectProp, onBack, onOpenFlow }) {
         formData: {},
         generalData: { fluxName: newFlowName.trim(), fluxDescription: newFlowDescription.trim() || '' },
       };
-      await addDoc(colRef, initial);
+      const ref = await addDoc(colRef, initial);
+      // Optimistic UI update so the first flow appears without needing a re-open
+      setFlows((prev) => [
+        {
+          id: ref.id,
+          ...initial,
+          // Ensure timestamp renders nicely until Firestore resolves
+          lastModified: { toDate: () => new Date() },
+        },
+        ...prev,
+      ]);
       setNewFlowName('');
       setNewFlowDescription('');
     } catch (e) {
@@ -112,9 +123,6 @@ function ProjectPage({ project: projectProp, onBack, onOpenFlow }) {
           <h1 className="text-2xl font-bold text-gray-900">{project?.projectName || 'Project'}</h1>
           <p className="text-gray-600">Flows inside this project</p>
         </div>
-        {onBack && (
-          <button onClick={onBack} className="border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-50">Back</button>
-        )}
       </div>
 
       <div className="mb-6 bg-white shadow rounded-lg p-4">
@@ -151,9 +159,8 @@ function ProjectPage({ project: projectProp, onBack, onOpenFlow }) {
           {flows.map((flow) => (
             <div
               key={flow.id}
-              className="bg-white border border-gray-200 rounded-md p-5 shadow-sm hover:shadow cursor-pointer"
+              className="bg-white border border-gray-200 rounded-md p-5 shadow-sm hover:shadow"
               style={{ boxShadow: '0 6px 14px rgba(0,0,0,0.04), 0 0 0 1px rgba(229,231,235,0.7)', minHeight: '68px' }}
-              onClick={() => onOpenFlow && onOpenFlow({ ...flow, projectId })}
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -167,7 +174,7 @@ function ProjectPage({ project: projectProp, onBack, onOpenFlow }) {
                     title="Open"
                     className="inline-flex items-center justify-center rounded-md text-sm font-medium text-white"
                     style={{ height: '40px', padding: '0 18px', background: '#16a34a' }}
-                    onClick={(e) => { e.stopPropagation(); onOpenFlow && onOpenFlow({ ...flow, projectId }); }}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/projects/${projectId}/flows/${flow.id}`); }}
                   >
                     Open
                   </button>

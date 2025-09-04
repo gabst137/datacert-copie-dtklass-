@@ -201,12 +201,12 @@ export const DataCategoriesNode = ({ data, isConnectable }) => {
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h18M3 12h18M3 17h18" />
           </svg>
         </div>
-        <div className="ml-2 w-64">
+        <div className="ml-2 w-80">
           <div className="text-sm font-bold text-gray-700">{data.label}</div>
           {Array.isArray(data.items) && data.items.length > 0 && (
             <ul className="mt-1 text-xs text-gray-700 list-disc list-inside space-y-0.5">
               {data.items.slice(0, 6).map((it, idx) => (
-                <li key={idx} className="truncate" title={it}>{it}</li>
+                <li key={idx} className="whitespace-normal break-words" title={it}>{it}</li>
               ))}
               {data.items.length > 6 && (
                 <li className="text-gray-500">+{data.items.length - 6} more…</li>

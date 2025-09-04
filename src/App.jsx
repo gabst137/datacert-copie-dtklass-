@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useState } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -12,16 +11,6 @@ import FlowPage from './components/FlowPage';
 import './App.css'
 
 function App() {
-  // State-based navigation inside the protected workspace
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [selectedFlow, setSelectedFlow] = useState(null);
-
-  const clearFlow = () => setSelectedFlow(null);
-  const clearProject = () => {
-    setSelectedProject(null);
-    setSelectedFlow(null);
-  };
-
   return (
     <AuthProvider>
       <NotificationProvider>
@@ -38,15 +27,7 @@ function App() {
               path="/dashboard" 
               element={
                 <ProtectedRoute>
-                  {selectedFlow ? (
-                    <FlowPage
-                      projectId={selectedProject?.id}
-                      flow={selectedFlow}
-                      onBack={clearFlow}
-                    />
-                  ) : (
-                    <Dashboard onOpenFlow={(flow) => { setSelectedProject({ id: flow.projectId }); setSelectedFlow(flow); }} />
-                  )}
+                  <Dashboard />
                 </ProtectedRoute>
               } 
             />
@@ -54,7 +35,7 @@ function App() {
               path="/dashboard/projects/:projectId"
               element={
                 <ProtectedRoute>
-                  <ProjectPage onOpenFlow={(flow) => setSelectedFlow(flow)} />
+                  <ProjectPage />
                 </ProtectedRoute>
               }
             />
@@ -62,7 +43,7 @@ function App() {
               path="/dashboard/projects/:projectId/flows/:flowId"
               element={
                 <ProtectedRoute>
-                  <FlowPage onBack={() => window.history.back()} />
+                  <FlowPage />
                 </ProtectedRoute>
               }
             />

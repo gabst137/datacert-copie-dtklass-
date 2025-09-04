@@ -7,7 +7,7 @@ import { db } from '../config/firebase';
 import { deleteFlowStorage } from '../utils/storageCleanup';
 import { useNotify } from '../contexts/NotificationContext';
 
-function Dashboard({ onOpenProject, onOpenFlow }) {
+function Dashboard({ onOpenProject }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -178,7 +178,7 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
     if (!name) return;
     try {
       const colRef = collection(db, `companies/${currentUser.uid}/projects/${pid}/flows`);
-      await addDoc(colRef, {
+      const docRef = await addDoc(colRef, {
         flowName: name,
         flowDescription: '',
         status: 'NU',
@@ -187,6 +187,22 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
         lastModified: serverTimestamp(),
         formData: {},
         generalData: { fluxName: name, fluxDescription: '' },
+      });
+      // Optimistic UI update so the newly created flow appears immediately
+      setFlows((m) => {
+        const prev = m[pid] || [];
+        const optimistic = {
+          id: docRef.id,
+          flowName: name,
+          flowDescription: '',
+          status: 'NU',
+          selectedUsers: [],
+          valid: false,
+          // Provide a shape compatible with the renderer (uses ?.toDate())
+          lastModified: { toDate: () => new Date() },
+          generalData: { fluxName: name, fluxDescription: '' },
+        };
+        return { ...m, [pid]: [optimistic, ...prev] };
       });
       setNewFlowName((m) => ({ ...m, [pid]: '' }));
     } catch (e) {
@@ -407,7 +423,7 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
                               </div>
                               <div className="flex items-center space-x-3">
                                 <button
-                                  onClick={() => onOpenFlow && onOpenFlow({ ...f, projectId: project.id })}
+                                  onClick={() => navigate(`/dashboard/projects/${project.id}/flows/${f.id}`)}
                                   className="inline-flex items-center justify-center rounded-md text-sm font-medium text-white"
                                   style={{ height: '40px', padding: '0 18px', background: '#16a34a' }}
                                 >
