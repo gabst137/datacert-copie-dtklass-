@@ -6,12 +6,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
 
 // Import all tab components
-import GeneralDataTab from './flow/tabs/GeneralDataTab';
-import PeopleTab from './flow/tabs/PeopleTab';
-import LegalBasisTab from './flow/tabs/LegalBasisTab';
+import InternalDataFlowTab from './flow/tabs/InternalDataFlowTab';
+import ExternalSEEFlowTab from './flow/tabs/ExternalSEEFlowTab';
+import ThirdCountryTransferTab from './flow/tabs/ThirdCountryTransferTab';
 import DataProcessingTab from './flow/tabs/DataProcessingTab';
 import DataStorageTab from './flow/tabs/DataStorageTab';
-import SecurityTab from './flow/tabs/SecurityTab';
+import SecurityMeasuresTab from './flow/tabs/SecurityMeasuresTab';
 import FlowDiagramModal from './flow/FlowDiagramModal';
 import DataCategoriesTab from './flow/tabs/DataCategoriesTab';
 
@@ -76,6 +76,8 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
   const [processes, setProcesses] = useState([]);
   const [diagramData, setDiagramData] = useState(null);
   const [activeTab, setActiveTab] = useState('general');
+  // Track changed top-level fields to minimize Firestore update payload
+  const changedKeysRef = useRef(new Set());
 
   // Memoized callback for diagram modal close to prevent unnecessary re-renders
   const handleDiagramModalClose = useCallback(() => {
@@ -85,6 +87,7 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
   // Memoized callback for categoryMatrix updates to prevent unnecessary re-renders
   const handleCategoryMatrixChange = useCallback((categoryMatrix) => {
     setFormData(prev => ({ ...prev, categoryMatrix }));
+    changedKeysRef.current.add('categoryMatrix');
   }, []);
 
   const projectId = flowProp?.projectId || projectIdProp || params.projectId;
@@ -149,14 +152,27 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
     if (!currentUser || !projectId || !flowId) return;
     try {
       setSaving(true);
-      await updateDoc(doc(db, `companies/${currentUser.uid}/projects/${projectId}/flows/${flowId}`), {
-        ...meta,
-        ...formData,
-        processes,
-        diagramData,
-        lastModified: serverTimestamp(),
-      });
+      // Build minimal update payload
+      const updatePayload = { lastModified: serverTimestamp() };
+      // Meta keys changed
+      for (const key of changedKeysRef.current) {
+        if (key === 'generalData' || key === 'peopleData' || key === 'legalData' || key === 'processingData' || key === 'storageData' || key === 'securityData' || key === 'categoryMatrix') {
+          updatePayload[key] = formData[key];
+        } else if (key === 'processes') {
+          updatePayload.processes = processes;
+        } else if (key === 'diagramData') {
+          updatePayload.diagramData = diagramData;
+        } else if (key in meta) {
+          updatePayload[key] = meta[key];
+        }
+      }
+      // If nothing tracked (manual save), include everything like before
+      if (Object.keys(updatePayload).length === 1) {
+        Object.assign(updatePayload, { ...meta, ...formData, processes, diagramData });
+      }
+      await updateDoc(doc(db, `companies/${currentUser.uid}/projects/${projectId}/flows/${flowId}`), updatePayload);
       setLastSaved(new Date());
+      changedKeysRef.current.clear();
     } catch (e) {
       console.error('Save failed', e);
       alert('Failed to save changes.');
@@ -197,31 +213,46 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
   // Memoized update handlers for each data section to prevent unnecessary re-renders
   const updateGeneralData = useCallback((data) => {
     setFormData(prev => ({ ...prev, generalData: data }));
+    changedKeysRef.current.add('generalData');
   }, []);
   
   const updatePeopleData = useCallback((data) => {
     setFormData(prev => ({ ...prev, peopleData: data }));
+    changedKeysRef.current.add('peopleData');
   }, []);
   
   const updateLegalData = useCallback((data) => {
     setFormData(prev => ({ ...prev, legalData: data }));
+    changedKeysRef.current.add('legalData');
   }, []);
   
   const updateProcessingData = useCallback((data) => {
     setFormData(prev => ({ ...prev, processingData: data }));
+    changedKeysRef.current.add('processingData');
   }, []);
   
   const updateStorageData = useCallback((data) => {
     setFormData(prev => ({ ...prev, storageData: data }));
+    changedKeysRef.current.add('storageData');
   }, []);
   
   const updateSecurityData = useCallback((data) => {
     setFormData(prev => ({ ...prev, securityData: data }));
+    changedKeysRef.current.add('securityData');
   }, []);
   
   // Memoized update handler for meta data to prevent unnecessary re-renders
-  const updateMeta = useCallback((updates) => {
-    setMeta(prev => ({ ...prev, ...updates }));
+  // Helper to update meta if needed by future UI bits
+  // Note: not currently used; remove to avoid linter complaints
+  
+  const updateProcesses = useCallback((list) => {
+    changedKeysRef.current.add('processes');
+    setProcesses(list);
+  }, []);
+  
+  const updateDiagramData = useCallback((data) => {
+    changedKeysRef.current.add('diagramData');
+    setDiagramData(data);
   }, []);
   
   // Handle PDF export
@@ -332,9 +363,9 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
       {/* Tabs */}
       <div className="mb-4">
         <div className="bg-white border border-gray-200 rounded-md p-2 flex flex-wrap">
-          <Tab id="general" active={activeTab === 'general'} onClick={setActiveTab}>Date generale</Tab>
-          <Tab id="people" active={activeTab === 'people'} onClick={setActiveTab}>Persoane vizate</Tab>
-          <Tab id="legal" active={activeTab === 'legal'} onClick={setActiveTab}>Detalii temei legal</Tab>
+          <Tab id="general" active={activeTab === 'general'} onClick={setActiveTab}>Flux intern</Tab>
+          <Tab id="people" active={activeTab === 'people'} onClick={setActiveTab}>Flux extern (SEE)</Tab>
+          <Tab id="legal" active={activeTab === 'legal'} onClick={setActiveTab}>Transfer state terțe</Tab>
           <Tab id="processing" active={activeTab === 'processing'} onClick={setActiveTab}>Prelucrare date</Tab>
           <Tab id="categories" active={activeTab === 'categories'} onClick={setActiveTab}>Categorii date</Tab>
           <Tab id="storage" active={activeTab === 'storage'} onClick={setActiveTab}>Stocare date</Tab>
@@ -344,33 +375,23 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
 
       {/* Tab Content */}
       {activeTab === 'general' && (
-        <GeneralDataTab
+        <InternalDataFlowTab
           generalData={formData.generalData}
-          selectedUsers={meta.selectedUsers}
-          status={meta.status}
-          valid={meta.valid}
           onGeneralDataChange={updateGeneralData}
-          onMetaChange={updateMeta}
         />
       )}
       
       {activeTab === 'people' && (
-        <PeopleTab
+        <ExternalSEEFlowTab
           peopleData={formData.peopleData}
           onPeopleDataChange={updatePeopleData}
-          flowId={flowId}
-          projectId={projectId}
-          userId={currentUser?.uid}
         />
       )}
       
       {activeTab === 'legal' && (
-        <LegalBasisTab
+        <ThirdCountryTransferTab
           legalData={formData.legalData}
           onLegalDataChange={updateLegalData}
-          flowId={flowId}
-          projectId={projectId}
-          userId={currentUser?.uid}
         />
       )}
       
@@ -379,7 +400,7 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
           processingData={formData.processingData}
           processes={processes}
           onProcessingDataChange={updateProcessingData}
-          onProcessesChange={setProcesses}
+          onProcessesChange={updateProcesses}
         />
       )}
 
@@ -401,12 +422,9 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
       )}
       
       {activeTab === 'security' && (
-        <SecurityTab
+        <SecurityMeasuresTab
           securityData={formData.securityData}
           onSecurityDataChange={updateSecurityData}
-          flowId={flowId}
-          projectId={projectId}
-          userId={currentUser?.uid}
         />
       )}
       
@@ -417,7 +435,7 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
         formData={formData}
         processes={processes}
         diagramData={diagramData}
-        onDiagramChange={setDiagramData}
+        onDiagramChange={updateDiagramData}
         flowId={flowId}
         projectId={projectId}
         userId={currentUser?.uid}

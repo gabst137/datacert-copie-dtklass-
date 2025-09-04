@@ -1,74 +1,29 @@
-import { useState, useRef, memo } from 'react';
+import { memo, useRef, useState } from 'react';
 import { sanitizeInput } from '../../../utils/helpers';
 
+// Headers per screenshot: Security general description table
 const HEADERS = [
-  'Enumerare / Listing',
-  'Modalitatea de prelucrare / Processing method',
-  'Durata prelucrării / Processing period',
-  'Durata prelucrare exclusiv prin stocare / Exclusive storage retention period',
-  'Temei legal al duratei prelucării / Legal basis for retention period'
+  'Enumerare / Enlisting',
+  'Documente relevante / Relevant documents',
 ];
 
+// Default rows: physical, technical, organisational measures
 const DEFAULT_ROWS = [
-  {
-    id: 'idData',
-    label:
-      'Date de identificare (nume, prenume, sex, adresă, data nașterii) / ID data (name, surname, address)'
-  },
-  {
-    id: 'contactData',
-    label:
-      'Date de contact (număr de telefon, adresă de email, adresă poștală) / Contact data (phone number, email address, postal address)'
-  },
-  {
-    id: 'educationData',
-    label:
-      'Date legate de studii, certificări, competențe / Data related to education, certifications, skills'
-  },
-  {
-    id: 'personalLife',
-    label:
-      'Aspecte legate de viața personală (stil de viață, situație familială etc.) / Personal life data (lifestyle, family situation, etc.)'
-  },
-  {
-    id: 'economic',
-    label:
-      'Informații de ordin economic și financiar (venituri, situație financiară, situație fiscală etc.) / Economic and financial information (income, financial situation, tax situation, etc.)'
-  },
-  {
-    id: 'professional',
-    label:
-      'Date legate de activitatea profesională desfășurată / Data related to professional activity'
-  },
-  { id: 'media', label: 'Imagini, voce / Photos, videos, voice' },
-  {
-    id: 'connection',
-    label: 'Date de conexiune (adresă IP, loguri de acces etc.) / Connection data (IP address, access logs etc.)'
-  },
-  {
-    id: 'location',
-    label: 'Date de localizare (GPS, GSM etc.) / Location data (GPS, GSM etc.)'
-  },
-  {
-    id: 'identityNumbers',
-    label:
-      'CNP, serie și număr act identitate/pașaport, permis auto / PIN, series and number of ID card/ driving license'
-  },
-  { id: 'other', label: 'Alte categorii de date / Other data categories' }
+  { id: 'physical', label: 'Măsuri fizice / Physical measures' },
+  { id: 'technical', label: 'Măsuri tehnice / Technical measures' },
+  { id: 'organizational', label: 'Măsuri organizatorice / Organisational measures' },
 ];
 
-// Define stable input component outside main component
 const FieldInput = memo(({ value, onChange, placeholder }) => (
   <input
     type="text"
     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white"
     value={value}
     onChange={(e) => onChange(e.target.value)}
-    placeholder={placeholder || "—"}
+    placeholder={placeholder || '—'}
   />
 ));
 
-// Define field row component outside main component
 const FieldRow = memo(({ label, value, onChange }) => (
   <div className="grid" style={{ gridTemplateColumns: 'minmax(220px, 38%) 1fr', gap: 12 }}>
     <div className="text-sm text-gray-700" style={{ alignSelf: 'center' }}>{label}</div>
@@ -76,36 +31,39 @@ const FieldRow = memo(({ label, value, onChange }) => (
   </div>
 ));
 
-function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
-  const newCategoryRef = useRef(null);
-  // Direct manipulation without draft state
-  const data = categoryMatrix || {};
+function SecurityMeasuresTab({ securityData = {}, onSecurityDataChange }) {
+  const newSecurityRef = useRef(null);
+  // Store matrix under securityData.matrix to avoid clashing with legacy fields
+  const data = securityData.matrix || {};
+
+  const update = (updated) => {
+    onSecurityDataChange?.({
+      ...securityData,
+      matrix: updated,
+    });
+  };
 
   const updateCell = (rowId, field, value) => {
     const updated = {
       ...data,
       [rowId]: {
         ...data[rowId],
-        [field]: value
-      }
+        [field]: value,
+      },
     };
-    onChange && onChange(updated);
+    update(updated);
   };
 
-  // Keep track of expanded state for row dropdowns
   const [open, setOpen] = useState({});
   const toggle = (id) => setOpen((m) => ({ ...m, [id]: !m[id] }));
 
-  // Build list with ONLY currently selected rows (data), ordered with defaults first
   const defaultIds = new Set(DEFAULT_ROWS.map((r) => r.id));
   const selectedDefaultRows = DEFAULT_ROWS.filter((r) => data[r.id]).map((r) => ({ id: r.id, label: r.label }));
   const customRowEntries = Object.keys(data)
     .filter((k) => !defaultIds.has(k))
     .map((k) => ({ id: k, label: data[k]?.__label || 'Categorie personalizată' }));
-
   const rows = [...selectedDefaultRows, ...customRowEntries];
 
-  // Dropdown menu for adding default rows
   const [menuOpen, setMenuOpen] = useState(false);
   const availableOptions = DEFAULT_ROWS.filter((r) => !data[r.id]);
 
@@ -117,13 +75,10 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
       [rowId]: {
         __label: rowDef.label,
         enumerare: '',
-        method: '',
-        period: '',
-        storageOnly: '',
-        legalBasis: ''
-      }
+        relevantDocs: '',
+      },
     };
-    onChange && onChange(updated);
+    update(updated);
     setOpen((m) => ({ ...m, [rowId]: true }));
     setMenuOpen(false);
   };
@@ -135,27 +90,26 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
       [id]: {
         __label: label || 'Categorie personalizată',
         enumerare: '',
-        method: '',
-        period: '',
-        storageOnly: '',
-        legalBasis: ''
-      }
+        relevantDocs: '',
+      },
     };
-    onChange && onChange(updated);
+    update(updated);
     setOpen((m) => ({ ...m, [id]: true }));
   };
 
   const removeRow = (id) => {
     const updated = { ...data };
     delete updated[id];
-    onChange && onChange(updated);
+    update(updated);
   };
 
   return (
     <div className="bg-white border border-gray-200 rounded-md p-4">
-      <div className="text-sm font-medium" style={{ marginBottom: 12 }}>Categorii de date personale prelucrate</div>
+      <div className="text-sm font-medium" style={{ marginBottom: 12 }}>
+        Securitatea datelor (descriere generală)
+      </div>
 
-      {/* Picker for default categories */}
+      {/* Picker for default measure categories */}
       <div className="relative" style={{ marginBottom: 16 }}>
         <button
           onClick={() => setMenuOpen((v) => !v)}
@@ -189,7 +143,7 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
         {rows.map((row) => {
           const label = defaultIds.has(row.id) ? row.label : (data[row.id]?.__label || row.label);
           const rowData = data[row.id] || {};
-          const completedCount = ['enumerare','method','period','storageOnly','legalBasis']
+          const completedCount = ['enumerare','relevantDocs']
             .reduce((acc, k) => acc + (rowData[k] && String(rowData[k]).trim() ? 1 : 0), 0);
           return (
             <div key={row.id} className="rounded-lg" style={{ marginBottom: 16 }}>
@@ -208,8 +162,7 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
                   <span className="text-gray-900">{label}</span>
                 </div>
                 <div className="flex items-center" style={{ gap: 10 }}>
-                  <span className="text-xs text-gray-600">{completedCount}/5 completate</span>
-                  {/* Remove button for selected categories */}
+                  <span className="text-xs text-gray-600">{completedCount}/2 completate</span>
                   <button
                     onClick={(e) => { e.stopPropagation(); removeRow(row.id); }}
                     className="text-xs rounded-md px-2 py-1 hover:bg-gray-50"
@@ -230,23 +183,8 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
                     />
                     <FieldRow 
                       label={HEADERS[1]} 
-                      value={rowData.method || ''}
-                      onChange={(value) => updateCell(row.id, 'method', value)}
-                    />
-                    <FieldRow 
-                      label={HEADERS[2]} 
-                      value={rowData.period || ''}
-                      onChange={(value) => updateCell(row.id, 'period', value)}
-                    />
-                    <FieldRow 
-                      label={HEADERS[3]} 
-                      value={rowData.storageOnly || ''}
-                      onChange={(value) => updateCell(row.id, 'storageOnly', value)}
-                    />
-                    <FieldRow 
-                      label={HEADERS[4]} 
-                      value={rowData.legalBasis || ''}
-                      onChange={(value) => updateCell(row.id, 'legalBasis', value)}
+                      value={rowData.relevantDocs || ''}
+                      onChange={(value) => updateCell(row.id, 'relevantDocs', value)}
                     />
                   </div>
 
@@ -269,7 +207,7 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
                                 __label: e.target.value 
                               } 
                             };
-                            onChange && onChange(updated);
+                            update(updated);
                           }}
                         />
                         <button onClick={() => removeRow(row.id)} className="text-xs border border-gray-300 rounded-md px-2 py-1 hover:bg-gray-50">Șterge</button>
@@ -287,10 +225,10 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
         <div className="text-sm font-medium" style={{ marginBottom: 8 }}>Adaugă categorie personalizată</div>
         <div className="flex" style={{ gap: 8 }}>
           <input
-            id="newCategoryName"
-            ref={newCategoryRef}
+            id="newSecurityCategoryName"
+            ref={newSecurityRef}
             type="text"
-            placeholder="Ex: Date biometrice"
+            placeholder="Ex: Alte măsuri"
             className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm"
             maxLength={200}
             onKeyDown={(e) => {
@@ -305,7 +243,7 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
           />
           <button
             onClick={() => {
-              const input = newCategoryRef.current;
+              const input = newSecurityRef.current;
               const name = sanitizeInput(input?.value || '', 200);
               if (name && name.length > 0) {
                 addCustomRow(name);
@@ -322,4 +260,4 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
   );
 }
 
-export default memo(DataCategoriesTab);
+export default memo(SecurityMeasuresTab);

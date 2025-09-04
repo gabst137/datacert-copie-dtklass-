@@ -51,12 +51,21 @@ export const ProcessNode = ({ data, isConnectable }) => {
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
         </div>
-        <div className="ml-2">
+        <div className="ml-2 w-56">
           <div className="text-sm font-bold text-gray-700">{data.label}</div>
-          {data.activities && data.activities.length > 0 && (
-            <div className="text-xs text-gray-500">
-              {data.activities.length} activities
-            </div>
+          {Array.isArray(data.lines) && data.lines.length > 0 ? (
+            <ul className="mt-1 text-xs text-gray-700 list-disc list-inside space-y-0.5">
+              {data.lines.slice(0, 6).map((line, idx) => (
+                <li key={idx} className="truncate" title={line}>{line}</li>
+              ))}
+              {data.lines.length > 6 && (
+                <li className="text-gray-500">+{data.lines.length - 6} more…</li>
+              )}
+            </ul>
+          ) : (
+            data.activities && data.activities.length > 0 && (
+              <div className="text-xs text-gray-500">{data.activities.length} activities</div>
+            )
           )}
         </div>
       </div>
@@ -192,10 +201,17 @@ export const DataCategoriesNode = ({ data, isConnectable }) => {
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h18M3 12h18M3 17h18" />
           </svg>
         </div>
-        <div className="ml-2">
+        <div className="ml-2 w-64">
           <div className="text-sm font-bold text-gray-700">{data.label}</div>
-          {Array.isArray(data.items) && (
-            <div className="text-xs text-gray-500">{data.items.length} categorii</div>
+          {Array.isArray(data.items) && data.items.length > 0 && (
+            <ul className="mt-1 text-xs text-gray-700 list-disc list-inside space-y-0.5">
+              {data.items.slice(0, 6).map((it, idx) => (
+                <li key={idx} className="truncate" title={it}>{it}</li>
+              ))}
+              {data.items.length > 6 && (
+                <li className="text-gray-500">+{data.items.length - 6} more…</li>
+              )}
+            </ul>
           )}
         </div>
       </div>

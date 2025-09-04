@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -53,7 +53,24 @@ const generateFlowChart = (formData, processes = []) => {
   const xSpacing = 250;
   const ySpacing = 120;
   
-  // Step 1: Create entity nodes for people categories
+  // Step 0: Internal departments (most logical start)
+  const internalDeptNodeIds = [];
+  if (formData.generalData?.internalFlow && Object.keys(formData.generalData.internalFlow).length > 0) {
+    const entries = Object.entries(formData.generalData.internalFlow)
+      .filter(([, v]) => v && (v.departmentName || v.accessMode));
+    entries.forEach(([key, v], index) => {
+      const nodeId = createNode(
+        'entity',
+        v.departmentName || v.__label || `Departament ${index + 1}`,
+        { x: xPos, y: yPos + (index * 80) },
+        { subLabel: v.accessMode ? `Acces: ${v.accessMode}` : 'Internal department' }
+      );
+      internalDeptNodeIds.push(nodeId);
+    });
+    if (internalDeptNodeIds.length > 0) xPos += xSpacing;
+  }
+
+  // Step 1: Create entity nodes for people categories (legacy fallback)
   const peopleNodeIds = [];
   if (formData.peopleData?.categories?.length > 0) {
     formData.peopleData.categories.forEach((category, index) => {
@@ -68,7 +85,7 @@ const generateFlowChart = (formData, processes = []) => {
     xPos += xSpacing;
   }
   
-  // Step 2: Create collection/input node if notification methods exist
+  // Step 2: Create collection/input node if notification methods exist (legacy)
   let collectionNodeId = null;
   if (formData.peopleData?.notificationMethods?.length > 0) {
     collectionNodeId = createNode(
@@ -78,9 +95,10 @@ const generateFlowChart = (formData, processes = []) => {
       { method: formData.peopleData.notificationMethods.join(', ') }
     );
     
-    // Connect people to collection
-    peopleNodeIds.forEach(personId => {
-      createEdge(personId, collectionNodeId, 'Provides');
+    // Connect upstream (internal departments preferred, then people subjects)
+    const upstream = internalDeptNodeIds.length > 0 ? internalDeptNodeIds : peopleNodeIds;
+    upstream.forEach(srcId => {
+      createEdge(srcId, collectionNodeId, 'Provides');
     });
     
     xPos += xSpacing;
@@ -101,6 +119,8 @@ const generateFlowChart = (formData, processes = []) => {
       // Connect from collection or people
       if (collectionNodeId) {
         createEdge(collectionNodeId, nodeId, 'Input');
+      } else if (internalDeptNodeIds.length > 0) {
+        createEdge(internalDeptNodeIds[0], nodeId, 'Data');
       } else if (peopleNodeIds.length > 0) {
         createEdge(peopleNodeIds[0], nodeId, 'Data');
       }
@@ -117,6 +137,8 @@ const generateFlowChart = (formData, processes = []) => {
     
     if (collectionNodeId) {
       createEdge(collectionNodeId, nodeId, 'Process');
+    } else if (internalDeptNodeIds.length > 0) {
+      createEdge(internalDeptNodeIds[0], nodeId, 'Data');
     } else if (peopleNodeIds.length > 0) {
       createEdge(peopleNodeIds[0], nodeId, 'Data');
     }
@@ -152,17 +174,30 @@ const generateFlowChart = (formData, processes = []) => {
     xPos += xSpacing;
   }
 
-  // Step 5: Create Data Categories node from matrix (if present)
+  // Step 5: Create Data Categories node from matrix (if present) with labels
   if (formData.categoryMatrix) {
-    const entries = Object.entries(formData.categoryMatrix)
+    const labelMap = {
+      idData: 'ID data',
+      contactData: 'Contact data',
+      educationData: 'Education/certifications',
+      personalLife: 'Personal life data',
+      economic: 'Economic/financial',
+      professional: 'Professional activity',
+      media: 'Photos/videos/voice',
+      connection: 'Connection data',
+      location: 'Location data',
+      identityNumbers: 'ID numbers (CNP etc.)',
+      other: 'Other',
+    };
+    const items = Object.entries(formData.categoryMatrix)
       .filter(([, v]) => v && (v.enumerare || v.method || v.period || v.storageOnly || v.legalBasis))
-      .map(([k]) => k);
-    if (entries.length > 0) {
+      .map(([k, v]) => v?.__label || labelMap[k] || k);
+    if (items.length > 0) {
       const dataNodeId = createNode(
         'data',
         'Categorii date',
-        { x: Math.max(50, xPos - 125), y: yPos + 240 },
-        { items: entries }
+        { x: Math.max(50, xPos - 125), y: yPos + 220 },
+        { items }
       );
       // connect to process nodes or storage if available
       if (processNodeIds.length > 0) {
@@ -173,7 +208,32 @@ const generateFlowChart = (formData, processes = []) => {
     }
   }
 
-  // Step 6: Create recipient/transfer nodes
+  // Step 5b: Create Processing Special Categories node (lines inside)
+  if (formData.processingData?.specialCategories && Object.keys(formData.processingData.specialCategories).length > 0) {
+    const lines = Object.entries(formData.processingData.specialCategories)
+      .filter(([, v]) => v && (v.enumerare || v.method || v.period || v.storageOnly || v.legalBasis || v.__label))
+      .map(([k, v]) => v?.__label || k);
+    if (lines.length > 0) {
+      const specNodeId = createNode(
+        'process',
+        'Prelucrare date',
+        { x: Math.max(50, xPos - 125), y: yPos + 80 },
+        { lines }
+      );
+      // connect upstream: internal dept/collection/people
+      const upstream = internalDeptNodeIds.length > 0 ? internalDeptNodeIds : (collectionNodeId ? [collectionNodeId] : peopleNodeIds);
+      upstream.forEach(srcId => createEdge(srcId, specNodeId, 'Date'));
+      // connect to storage and processes if available
+      if (processNodeIds.length > 0) {
+        processNodeIds.forEach(pid => createEdge(specNodeId, pid, 'Procesare'));
+      }
+      if (storageNodeId) {
+        createEdge(specNodeId, storageNodeId, 'Store');
+      }
+    }
+  }
+
+  // Step 6: Create recipient/transfer nodes (legacy arrays)
   const recipientCategories = [
     ...(formData.processingData?.recipientCategories || []),
     ...(formData.storageData?.recipientCategories || [])
@@ -198,14 +258,73 @@ const generateFlowChart = (formData, processes = []) => {
       }
     });
   }
+
+  // Step 6b: External SEE transfers (new matrix)
+  if (formData.peopleData?.externalSEE && Object.keys(formData.peopleData.externalSEE).length > 0) {
+    const entries = Object.entries(formData.peopleData.externalSEE)
+      .filter(([, v]) => v && (v.recipient || v.category || v.destState || v.legalBasis || v.transferType));
+    entries.forEach(([key, v], index) => {
+      const method = [
+        v.destState ? `State: ${v.destState}` : null,
+        v.legalBasis ? `Basis: ${v.legalBasis}` : null,
+        v.transferType ? `Type: ${v.transferType}` : null,
+        v.category ? `Cat: ${v.category}` : null,
+      ].filter(Boolean).join(' • ');
+      const nodeId = createNode(
+        'transfer',
+        v.__label || v.recipient || `SEE recipient ${index + 1}`,
+        { x: xPos, y: yPos + (index * 90) },
+        { method }
+      );
+      if (storageNodeId) {
+        createEdge(storageNodeId, nodeId, 'SEE Transfer');
+      } else if (processNodeIds.length > 0) {
+        createEdge(processNodeIds[processNodeIds.length - 1], nodeId, 'SEE Transfer');
+      }
+    });
+    xPos += xSpacing;
+  }
+
+  // Step 6c: Third-country/international organisation transfers (new matrix)
+  if (formData.legalData?.thirdCountries && Object.keys(formData.legalData.thirdCountries).length > 0) {
+    const baseX = Math.max(50, xPos);
+    const entries = Object.entries(formData.legalData.thirdCountries)
+      .filter(([, v]) => v && (v.recipient || v.category || v.destState || v.legalBasis || v.transferType));
+    entries.forEach(([key, v], index) => {
+      const method = [
+        v.destState ? `State: ${v.destState}` : null,
+        v.legalBasis ? `Basis: ${v.legalBasis}` : null,
+        v.transferType ? `Type: ${v.transferType}` : null,
+        v.category ? `Cat: ${v.category}` : null,
+      ].filter(Boolean).join(' • ');
+      const nodeId = createNode(
+        'transfer',
+        v.__label || v.recipient || `Third-country recipient ${index + 1}`,
+        { x: baseX, y: yPos + (index * 90) },
+        { method }
+      );
+      if (storageNodeId) {
+        createEdge(storageNodeId, nodeId, 'Third-country Transfer');
+      } else if (processNodeIds.length > 0) {
+        createEdge(processNodeIds[processNodeIds.length - 1], nodeId, 'Third-country Transfer');
+      }
+    });
+  }
   
-  // Step 7: Add security node if security measures exist
-  if (formData.securityData?.technicalMeasures?.length > 0 || 
+  // Step 7: Add security node if security measures exist (matrix or legacy)
+  if ((formData.securityData?.matrix && Object.keys(formData.securityData.matrix).length > 0) ||
+      formData.securityData?.technicalMeasures?.length > 0 || 
       formData.securityData?.organizationalMeasures?.length > 0) {
+    const matrixMeasures = formData.securityData?.matrix
+      ? Object.values(formData.securityData.matrix)
+          .filter((v) => v && (v.enumerare || v.relevantDocs))
+          .map((v) => v.enumerare || v.__label)
+      : [];
     const measures = [
+      ...matrixMeasures,
       ...(formData.securityData.technicalMeasures || []),
       ...(formData.securityData.organizationalMeasures || [])
-    ];
+    ].filter(Boolean);
     
     const securityNodeId = createNode(
       'security',
@@ -236,6 +355,7 @@ function FlowChart({
   const [edges, setEdges] = useState([]);
   const [isAutoLayout, setIsAutoLayout] = useState(true);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
   
   // Generate initial flowchart on component mount or when data changes
   useEffect(() => {
@@ -273,6 +393,16 @@ function FlowChart({
     },
     [nodes, edges, onDiagramChange]
   );
+  
+  // Selected node + updater
+  const selectedNode = useMemo(() => nodes.find((n) => n.id === selectedNodeId), [nodes, selectedNodeId]);
+  const handleUpdateSelectedNode = (mergeData) => {
+    setNodes((prev) => {
+      const next = prev.map((n) => n.id === selectedNodeId ? { ...n, data: { ...n.data, ...mergeData(n.data || {}) } } : n);
+      if (onDiagramChange) onDiagramChange({ nodes: next, edges });
+      return next;
+    });
+  };
   
   const onConnect = useCallback(
     (params) => {
@@ -374,7 +504,7 @@ function FlowChart({
   };
   
   return (
-    <div className="w-full h-[600px] bg-white border border-gray-200 rounded-lg">
+    <div className="w-full bg-white border border-gray-200 rounded-lg" style={{ height: '60vh', minHeight: 520 }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -382,8 +512,10 @@ function FlowChart({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onInit={setReactFlowInstance}
+        onSelectionChange={({ nodes: sel = [] }) => setSelectedNodeId(sel[0]?.id || null)}
         nodeTypes={nodeTypes}
         fitView
+        style={{ width: '100%', height: '100%' }}
         className="bg-gray-50"
       >
         <Background color="#e5e7eb" gap={16} />
@@ -437,6 +569,37 @@ function FlowChart({
             <option value="security">Security</option>
           </select>
         </Panel>
+
+        {selectedNode && (
+          <Panel position="bottom-right" className="bg-white border border-gray-300 rounded-md p-3 w-80 shadow-md">
+            <div className="text-sm font-semibold text-gray-800 mb-2">Edit node</div>
+            <label className="block text-xs text-gray-600 mb-1">Title</label>
+            <input
+              type="text"
+              className="w-full mb-2 px-2 py-1 border border-gray-300 rounded"
+              value={selectedNode.data?.label || ''}
+              onChange={(e) => handleUpdateSelectedNode(() => ({ label: e.target.value }))}
+            />
+
+            {(Array.isArray(selectedNode.data?.lines) || Array.isArray(selectedNode.data?.items)) && (
+              <>
+                <label className="block text-xs text-gray-600 mb-1">Sub-items (one per line)</label>
+                <textarea
+                  className="w-full h-28 mb-2 px-2 py-1 border border-gray-300 rounded text-xs"
+                  value={(selectedNode.data?.lines || selectedNode.data?.items || []).join('\n')}
+                  onChange={(e) => {
+                    const arr = e.target.value.split('\n').map((s) => s.trim()).filter(Boolean);
+                    handleUpdateSelectedNode((data) => (data.lines ? { lines: arr } : { items: arr }));
+                  }}
+                />
+              </>
+            )}
+
+            <div className="flex justify-between items-center mt-1">
+              <button className="text-xs text-gray-600 hover:text-gray-800" onClick={() => setSelectedNodeId(null)}>Close</button>
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
     </div>
   );

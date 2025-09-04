@@ -1,4 +1,5 @@
-import { useState, memo } from 'react';
+import { useState, useRef, memo } from 'react';
+import { sanitizeInput } from '../../../utils/helpers';
 
 // Column headers (mirrors DataCategoriesTab)
 const HEADERS = [
@@ -42,6 +43,7 @@ const FieldRow = memo(({ label, value, onChange }) => (
 
 // Component API remains compatible with FlowPage: it receives processingData and onProcessingDataChange
 function DataProcessingTab({ processingData = {}, onProcessingDataChange }) {
+  const newSpecialRef = useRef(null);
   // Persist matrix inside processingData under `specialCategories`
   const data = processingData.specialCategories || {};
 
@@ -259,13 +261,15 @@ function DataProcessingTab({ processingData = {}, onProcessingDataChange }) {
         <div className="flex" style={{ gap: 8 }}>
           <input
             id="newSpecialCategoryName"
+            ref={newSpecialRef}
             type="text"
             placeholder="Ex: Alte categorii sensibile"
             className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm"
+            maxLength={200}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                const name = e.currentTarget.value.trim();
-                if (name) {
+                const name = sanitizeInput(e.currentTarget.value, 200);
+                if (name && name.length > 0) {
                   addCustomRow(name);
                   e.currentTarget.value = '';
                 }
@@ -274,9 +278,9 @@ function DataProcessingTab({ processingData = {}, onProcessingDataChange }) {
           />
           <button
             onClick={() => {
-              const input = document.getElementById('newSpecialCategoryName');
-              const name = input?.value?.trim();
-              if (name) {
+              const input = newSpecialRef.current;
+              const name = sanitizeInput(input?.value || '', 200);
+              if (name && name.length > 0) {
                 addCustomRow(name);
                 if (input) input.value = '';
               }
@@ -292,4 +296,3 @@ function DataProcessingTab({ processingData = {}, onProcessingDataChange }) {
 }
 
 export default memo(DataProcessingTab);
-
