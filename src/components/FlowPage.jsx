@@ -17,6 +17,8 @@ import DataCategoriesTab from './flow/tabs/DataCategoriesTab';
 
 // Import utilities
 import { exportFlowToPDF } from '../utils/pdfGenerator';
+import ErrorBoundary from './common/ErrorBoundary';
+import { useNotify } from '../contexts/NotificationContext';
 
 function Tab({ id, active, onClick, children }) {
   return (
@@ -34,6 +36,7 @@ function Tab({ id, active, onClick, children }) {
 }
 
 function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
+  const notify = useNotify();
   const { currentUser } = useAuth();
   const params = useParams();
   const [loading, setLoading] = useState(true);
@@ -149,7 +152,10 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
 
   // Manual save only (auto-save disabled)
   const handleSave = useCallback(async () => {
-    if (!currentUser || !projectId || !flowId) return;
+    if (!currentUser || !projectId || !flowId) {
+      notify.error('Nu se poate salva: datele de identificare lipsesc.');
+      return;
+    }
     try {
       setSaving(true);
       // Build minimal update payload
@@ -175,17 +181,20 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
       changedKeysRef.current.clear();
     } catch (e) {
       console.error('Save failed', e);
-      alert('Failed to save changes.');
+      notify.error('Salvarea a eșuat. Încearcă din nou.');
     } finally {
       setSaving(false);
     }
-  }, [currentUser, projectId, flowId, meta, formData, processes, diagramData]);
+  }, [currentUser, projectId, flowId, meta, formData, processes, diagramData, notify]);
   
   // Note: auto-save intentionally disabled for better control
   
   // Clone flow functionality
   async function handleCloneFlow() {
-    if (!currentUser || !projectId || !flowId) return;
+    if (!currentUser || !projectId || !flowId) {
+      notify.error('Clonarea a eșuat: date lipsă.');
+      return;
+    }
     
     try {
       const newFlowData = {
@@ -203,10 +212,10 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
         newFlowData
       );
       
-      alert(`Flow cloned successfully! New flow ID: ${docRef.id}`);
+      notify.success(`Flux clonat cu succes (ID: ${docRef.id}).`);
     } catch (e) {
       console.error('Clone failed', e);
-      alert('Failed to clone flow.');
+      notify.error('Clonarea a eșuat.');
     }
   }
 
@@ -262,7 +271,7 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
       console.log(`PDF exported: ${fileName}`);
     } catch (error) {
       console.error('PDF export failed:', error);
-      alert('Failed to export PDF');
+      notify.error('Exportul PDF a eșuat.');
     }
   };
 
@@ -375,71 +384,87 @@ function FlowPage({ projectId: projectIdProp, flow: flowProp, onBack }) {
 
       {/* Tab Content */}
       {activeTab === 'general' && (
-        <InternalDataFlowTab
-          generalData={formData.generalData}
-          onGeneralDataChange={updateGeneralData}
-        />
+        <ErrorBoundary>
+          <InternalDataFlowTab
+            generalData={formData.generalData}
+            onGeneralDataChange={updateGeneralData}
+          />
+        </ErrorBoundary>
       )}
       
       {activeTab === 'people' && (
-        <ExternalSEEFlowTab
-          peopleData={formData.peopleData}
-          onPeopleDataChange={updatePeopleData}
-        />
+        <ErrorBoundary>
+          <ExternalSEEFlowTab
+            peopleData={formData.peopleData}
+            onPeopleDataChange={updatePeopleData}
+          />
+        </ErrorBoundary>
       )}
       
       {activeTab === 'legal' && (
-        <ThirdCountryTransferTab
-          legalData={formData.legalData}
-          onLegalDataChange={updateLegalData}
-        />
+        <ErrorBoundary>
+          <ThirdCountryTransferTab
+            legalData={formData.legalData}
+            onLegalDataChange={updateLegalData}
+          />
+        </ErrorBoundary>
       )}
       
       {activeTab === 'processing' && (
-        <DataProcessingTab
-          processingData={formData.processingData}
-          processes={processes}
-          onProcessingDataChange={updateProcessingData}
-          onProcessesChange={updateProcesses}
-        />
+        <ErrorBoundary>
+          <DataProcessingTab
+            processingData={formData.processingData}
+            processes={processes}
+            onProcessingDataChange={updateProcessingData}
+            onProcessesChange={updateProcesses}
+          />
+        </ErrorBoundary>
       )}
 
       {activeTab === 'categories' && (
-        <DataCategoriesTab
-          categoryMatrix={formData.categoryMatrix}
-          onChange={handleCategoryMatrixChange}
-        />
+        <ErrorBoundary>
+          <DataCategoriesTab
+            categoryMatrix={formData.categoryMatrix}
+            onChange={handleCategoryMatrixChange}
+          />
+        </ErrorBoundary>
       )}
       
       {activeTab === 'storage' && (
-        <DataStorageTab
-          storageData={formData.storageData}
-          onStorageDataChange={updateStorageData}
+        <ErrorBoundary>
+          <DataStorageTab
+            storageData={formData.storageData}
+            onStorageDataChange={updateStorageData}
+            flowId={flowId}
+            projectId={projectId}
+            userId={currentUser?.uid}
+          />
+        </ErrorBoundary>
+      )}
+      
+      {activeTab === 'security' && (
+        <ErrorBoundary>
+          <SecurityMeasuresTab
+            securityData={formData.securityData}
+            onSecurityDataChange={updateSecurityData}
+          />
+        </ErrorBoundary>
+      )}
+      
+      {/* Flow Diagram Modal */}
+      <ErrorBoundary>
+        <FlowDiagramModal
+          isOpen={showDiagramModal}
+          onClose={handleDiagramModalClose}
+          formData={formData}
+          processes={processes}
+          diagramData={diagramData}
+          onDiagramChange={updateDiagramData}
           flowId={flowId}
           projectId={projectId}
           userId={currentUser?.uid}
         />
-      )}
-      
-      {activeTab === 'security' && (
-        <SecurityMeasuresTab
-          securityData={formData.securityData}
-          onSecurityDataChange={updateSecurityData}
-        />
-      )}
-      
-      {/* Flow Diagram Modal */}
-      <FlowDiagramModal
-        isOpen={showDiagramModal}
-        onClose={handleDiagramModalClose}
-        formData={formData}
-        processes={processes}
-        diagramData={diagramData}
-        onDiagramChange={updateDiagramData}
-        flowId={flowId}
-        projectId={projectId}
-        userId={currentUser?.uid}
-      />
+      </ErrorBoundary>
 
     </div>
   );

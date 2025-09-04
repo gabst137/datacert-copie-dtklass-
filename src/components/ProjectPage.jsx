@@ -5,9 +5,11 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, g
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
 import { deleteFlowStorage } from '../utils/storageCleanup';
+import { useNotify } from '../contexts/NotificationContext';
 
 function ProjectPage({ project: projectProp, onBack, onOpenFlow }) {
   const { currentUser } = useAuth();
+  const notify = useNotify();
   const params = useParams();
   const [project, setProject] = useState(projectProp || null);
   const [flows, setFlows] = useState([]);
@@ -81,6 +83,7 @@ function ProjectPage({ project: projectProp, onBack, onOpenFlow }) {
       setNewFlowDescription('');
     } catch (e) {
       console.error('Failed to create flow', e);
+      notify.error('Crearea fluxului a eșuat.');
     } finally {
       setCreating(false);
     }
@@ -98,7 +101,7 @@ function ProjectPage({ project: projectProp, onBack, onOpenFlow }) {
       await deleteDoc(doc(db, `companies/${currentUser.uid}/projects/${projectId}/flows/${flow.id}`));
     } catch (err) {
       console.error('Failed to delete flow', err);
-      alert('Failed to delete flow');
+      notify.error('Ștergerea fluxului a eșuat.');
     }
   }
 

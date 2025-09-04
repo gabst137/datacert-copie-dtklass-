@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNotify } from '../../contexts/NotificationContext';
 import { useDropzone } from 'react-dropzone';
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from '../../config/firebase';
@@ -15,6 +16,7 @@ function DocumentUploader({
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
+  const notify = useNotify();
 
   const acceptedTypes = useMemo(() => ({
     'application/pdf': ['.pdf'],
@@ -92,7 +94,7 @@ function DocumentUploader({
       onDocumentsChange(documents.filter(d => d.id !== doc.id));
     } catch (error) {
       console.error('Delete failed:', error);
-      alert('Failed to delete document');
+      notify.error('Ștergerea documentului a eșuat.');
     }
   };
 
@@ -103,14 +105,13 @@ function DocumentUploader({
       for (const file of acceptedFiles) {
         // extra guard; react-dropzone should filter by accept/maxSize already
         if (file.size > 10 * 1024 * 1024) {
-          // eslint-disable-next-line no-alert
-          alert(`${file.name} is larger than 10MB and was skipped.`);
+          notify.info(`${file.name} depășește 10MB și a fost omis.`);
           continue;
         }
         await uploadFile(file);
       }
     } catch (error) {
-      alert('Failed to upload files');
+      notify.error('Încărcarea fișierelor a eșuat.');
     } finally {
       setUploading(false);
     }

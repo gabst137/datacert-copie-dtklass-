@@ -5,6 +5,7 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, getDoc
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
 import { deleteFlowStorage } from '../utils/storageCleanup';
+import { useNotify } from '../contexts/NotificationContext';
 
 function Dashboard({ onOpenProject, onOpenFlow }) {
   const [projects, setProjects] = useState([]);
@@ -20,6 +21,7 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
   const [deletingProjectId, setDeletingProjectId] = useState(null);
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
+  const notify = useNotify();
 
   // Fetch projects and show the full dashboard
   useEffect(() => {
@@ -79,6 +81,7 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
       setExpanded((e) => ({ ...e, [docRef.id]: true }));
     } catch (error) {
       console.error('Failed to create project:', error);
+      notify.error('Crearea proiectului a eșuat.');
     } finally {
       setCreatingProject(false);
     }
@@ -162,7 +165,7 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
       });
     } catch (e) {
       console.error('Failed to delete project', e);
-      alert('Failed to delete project');
+      notify.error('Ștergerea proiectului a eșuat.');
     } finally {
       setDeletingProjectId(null);
     }
@@ -188,7 +191,7 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
       setNewFlowName((m) => ({ ...m, [pid]: '' }));
     } catch (e) {
       console.error('Failed to create flow', e);
-      alert('Failed to create flow');
+      notify.error('Crearea fluxului a eșuat.');
     }
   }
 
@@ -201,7 +204,7 @@ function Dashboard({ onOpenProject, onOpenFlow }) {
       await deleteDoc(doc(db, `companies/${currentUser.uid}/projects/${project.id}/flows/${flow.id}`));
     } catch (e) {
       console.error('Failed to delete flow', e);
-      alert('Failed to delete flow');
+      notify.error('Ștergerea fluxului a eșuat.');
     }
   }
 

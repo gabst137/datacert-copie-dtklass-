@@ -260,13 +260,15 @@ function DataCategoriesTab({ categoryMatrix = {}, onChange }) {
                           type="text"
                           placeholder="Redenumește categoria"
                           className="border border-gray-300 rounded-md px-2 py-1 text-xs"
+                          maxLength={200}
                           value={data[row.id]?.__label || ''}
                           onChange={(e) => {
+                            const cleaned = sanitizeInput(e.target.value, 200);
                             const updated = { 
                               ...data, 
                               [row.id]: { 
                                 ...data[row.id], 
-                                __label: e.target.value 
+                                __label: cleaned
                               } 
                             };
                             onChange && onChange(updated);

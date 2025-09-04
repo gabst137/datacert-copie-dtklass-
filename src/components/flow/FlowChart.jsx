@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useNotify } from '../../contexts/NotificationContext';
 import {
   ReactFlow,
   Controls,
@@ -351,6 +352,7 @@ function FlowChart({
   projectId,
   userId 
 }) {
+  const notify = useNotify();
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [isAutoLayout, setIsAutoLayout] = useState(true);
@@ -443,7 +445,7 @@ function FlowChart({
   // Export as image (hi-DPI, guards empty diagram)
   const handleExportImage = useCallback(() => {
     if (!nodes || nodes.length === 0) {
-      alert('Nothing to export. Add nodes to the diagram first.');
+      notify.info('Nimic de exportat. Adăugați noduri în diagramă.');
       return;
     }
     const nodesBounds = getNodesBounds(nodes);
@@ -477,10 +479,10 @@ function FlowChart({
         })
         .catch((err) => {
           console.error('Failed to export image:', err);
-          alert('Failed to export flowchart as image');
+          notify.error('Exportul imaginii a eșuat.');
         });
     }
-  }, [nodes, flowId]);
+  }, [nodes, flowId, notify]);
   
   // Add new node
   const handleAddNode = (type = 'entity') => {

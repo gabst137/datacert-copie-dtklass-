@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useState } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import { NotificationProvider } from './contexts/NotificationContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
@@ -23,6 +24,7 @@ function App() {
 
   return (
     <AuthProvider>
+      <NotificationProvider>
       <BrowserRouter>
         <ErrorBoundary>
         <div className="App">
@@ -74,6 +76,7 @@ function App() {
         </div>
         </ErrorBoundary>
       </BrowserRouter>
+      </NotificationProvider>
     </AuthProvider>
   )
 }
